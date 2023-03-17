@@ -82,9 +82,10 @@ class BodyContainerMixin:
             fixture.density = mass/area
 
             L = sqrt(sum(x*x for x in body.position))
-            dr = max(L + r - parent_radius, 0)
-            f = [-10*dr*x/L for x in body.position]
-            body.ApplyForce(force=f, point=(0,0), wake=False)
+            if L + r - parent_radius > 0:
+                # dr = max(L + r - parent_radius, 0)
+                f = [-x/L for x in body.position]
+                body.ApplyForce(force=f, point=(0,0), wake=False)
         self.b2subworld.Step(self._time_step, 10, 10)
 
     def b2subworlds_step(self):

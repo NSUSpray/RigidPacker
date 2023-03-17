@@ -25,7 +25,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
 app = QApplication(sys.argv)
-storage = Storage('../../inventory.db')
+# storage = Storage('../../inventory.db')
+storage = Storage('../sample.db')
 model = Model(storage, target_fps=30.0385)
 window = MainWindow(model)
 window.showMaximized()

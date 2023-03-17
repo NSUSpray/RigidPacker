@@ -15,6 +15,7 @@ class Circle(QGraphicsEllipseItem):
         self.setPen(Qt.transparent)
         # self.setBrush(Qt.white)
         # self.setFlag(self.ItemIsMovable)
+        # self.setFlag(self.ItemClipsChildrenToShape)
         self.setAcceptHoverEvents(True)
         self._radius = r
 
@@ -24,9 +25,12 @@ class Circle(QGraphicsEllipseItem):
             self._radius = r
         super().setPos(x, y)
 
-    def hoverEnterEvent(self, event): self.setPen(Qt.black)
+    def hoverEnterEvent(self, event):
+        self._initial_pen = self.pen()
+        self.setPen(Qt.gray)
 
-    def hoverLeaveEvent(self, event): self.setPen(Qt.transparent)
+    def hoverLeaveEvent(self, event):
+        self.setPen(self._initial_pen)
 
 
 def make_color_from(s):
@@ -37,9 +41,11 @@ def make_color_from(s):
     elif 'а' <= s <= 'я' or s == 'ё':
         if s == 'ё': s = 'е'
         hue = (ord(s) - ord('а'))/(ord('я') - ord('а'))*255
+    elif '0' <= s <= '9':
+        hue = (ord(s) - ord('0'))/(ord('9') - ord('0'))*255
     else:
-        return Qt.white
-    return QColor.fromHsv(hue, sat, 255)
+        return 0, 0
+    return hue, sat
 
 
 class GraphicsContainerMixin:
@@ -56,8 +62,9 @@ class GraphicsContainerMixin:
             self.q_scene.addItem(q_item)
         q_item.setData(0, self)
         q_item.setToolTip(child.name)
-        color = make_color_from(child.name)
-        q_item.setBrush(color)
+        hue, sat = make_color_from(child.name)
+        q_item.setBrush(QColor.fromHsv(hue, sat, 255))
+        q_item.setPen(QColor.fromHsv(hue, sat, 239))
         child.q_item = q_item
 
     def create_graphics_for_children(self):
