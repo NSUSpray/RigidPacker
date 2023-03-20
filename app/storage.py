@@ -1,17 +1,26 @@
 import sqlite3
+from math import pi
+from dataclasses import dataclass, field
 
 
-class ItemBase:
+@dataclass
+class ItemDataBase:
+    id: int
+    name: str
+    product_name: str = ''
+    is_root: bool = field(init=False, repr=True)
+    def __post_init__(self): self.is_root = (self.id==Storage.root_id)
 
+
+@dataclass
+class PhysicalItemDataMixin:
+    self_mass: float = 1.0
+    self_volume: float = 4/3 * pi * (0.1)**3
+
+
+@dataclass
+class ItemData(PhysicalItemDataMixin, ItemDataBase):
     ''' Represents data transfer objects (DTO). Contains only database data '''
-
-    def __init__(self, item_id, name, product_name=''):
-        self.id = item_id
-        self.name = name
-        self.product_name = product_name
-
-    @property
-    def is_root(self): return self.id == Storage.root_id
 
 
 class Storage:
@@ -25,8 +34,9 @@ class Storage:
     def __init__(self, filename):
         self._connect = sqlite3.connect(filename)
         self._cursor = self._connect.cursor()
+        self._arrangement_id: int
         self.arrangement = self.default_arrangement
-        self.root = ItemBase(self.root_id, self.root_name)
+        self.root = ItemData(self.root_id, self.root_name)
 
     def __del__(self):
         self._cursor.close()
@@ -49,15 +59,6 @@ class Storage:
         if not response: raise sqlite3.ProgrammingError
         self._arrangement_id = response[0]
 
-    def item(self, name):
-        self._cursor.execute('''
-            SELECT item_id, name, product_name FROM item WHERE name IS ?
-            ''', (name,))
-        response = self._cursor.fetchone()
-        if not response: raise sqlite3.ProgrammingError
-        data = response[0]
-        return ItemBase(data[0], data[1])
-
     def children_of(self, item):
         self._cursor.execute('''
             SELECT item_id, name, product_name FROM placement
@@ -67,6 +68,6 @@ class Storage:
         ''', (item.id or None, self._arrangement_id))
         response = self._cursor.fetchall()
         return [
-            ItemBase(item_id, name, product_name)
+            ItemData(item_id, name, product_name)
                 for item_id, name, product_name in response
             ]

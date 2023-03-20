@@ -7,7 +7,7 @@ class Ui_MainWindow:
 
     def __init__(self):
         view = QGraphicsView()
-        view.setBackgroundBrush(Qt.lightGray)
+        view.setBackgroundBrush(Qt.gray)
         view.setRenderHint(QPainter.Antialiasing)
         view.setFrameShape(QFrame.NoFrame)
         view.setSceneRect(-1, -1, 2, 2)  # always centered

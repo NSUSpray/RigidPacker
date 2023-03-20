@@ -5,85 +5,84 @@ from PyQt5.QtWidgets import QGraphicsEllipseItem, QGraphicsScene
 from PyQt5.QtGui import QColor
 
 
-GRAPHICS_RATIO = 200
+GRAPHICS_RATIO = 200.0
 
 
-class Circle(QGraphicsEllipseItem):
+class GraphicsCircle(QGraphicsEllipseItem):
 
-    def __init__(self, r):
-        super().__init__(-r, -r, 2*r, 2*r)  # left top width height
+    def __init__(self, item):
+        r = item.radius * GRAPHICS_RATIO
+        super().__init__(-r, -r, 2.0*r, 2.0*r)  # left top width height
+        self._item = item
         self.setPen(Qt.transparent)
-        # self.setBrush(Qt.white)
+        self._fill()
+        # self.setToolTip(str(item))
         # self.setFlag(self.ItemIsMovable)
-        # self.setFlag(self.ItemClipsChildrenToShape)
+        self.setFlag(self.ItemClipsChildrenToShape)
         self.setAcceptHoverEvents(True)
-        self._radius = r
+
+    def setRadius(self, r):
+        r *= GRAPHICS_RATIO
+        self.setRect(-r, -r, 2.0*r, 2.0*r)  # left top width height
 
     def setPos(self, x, y, r=None):
-        if r:
-            super().setRect(-r, -r, 2*r, 2*r)  # left top width height
-            self._radius = r
-        super().setPos(x, y)
+        if r: self.setRadius(r)
+        super().setPos(x*GRAPHICS_RATIO, y*GRAPHICS_RATIO)
 
     def hoverEnterEvent(self, event):
-        self._initial_pen = self.pen()
-        self.setPen(Qt.gray)
+        self.setFlag(self.ItemClipsChildrenToShape, enabled=False)
+        # self._initial_pen = self.pen()
+        # self.setPen(Qt.gray)
+        self._item.model.hovered_item = self._item
+        self._item.pinch_body()
 
     def hoverLeaveEvent(self, event):
-        self.setPen(self._initial_pen)
+        self.setFlag(self.ItemClipsChildrenToShape)
+        # self.setPen(self._initial_pen)
+        self._item.model.hovered_item = None
+        self._item.release_body()
 
-
-def make_color_from(s):
-    sat = 255 / len(s)**0.2
-    s = s[0].lower()
-    if 'a' <= s <= 'z':
-        hue = (ord(s) - ord('a'))/(ord('z') - ord('a'))*255
-    elif 'а' <= s <= 'я' or s == 'ё':
-        if s == 'ё': s = 'е'
-        hue = (ord(s) - ord('а'))/(ord('я') - ord('а'))*255
-    elif '0' <= s <= '9':
-        hue = (ord(s) - ord('0'))/(ord('9') - ord('0'))*255
-    else:
-        return 0, 0
-    return hue, sat
+    def _fill(self):
+        name = self._item.name
+        sat = 255 / len(name)**0.2
+        c = name[0].lower()
+        if 'a' <= c <= 'z':
+            hue = (ord(c) - ord('a'))/(ord('z') - ord('a'))*255
+        elif 'а' <= c <= 'я' or c == 'ё':
+            if c == 'ё': c = 'е'
+            hue = (ord(c) - ord('а'))/(ord('я') - ord('а'))*255
+        elif '0' <= c <= '9':
+            hue = (ord(c) - ord('0'))/(ord('9') - ord('0'))*255
+        else:
+            self.setBrush(QColor.white)
+        return self.setBrush(QColor.fromHsv(hue, sat, 255))
 
 
 class GraphicsContainerMixin:
 
     def __init__(self):
-        self.q_item: Circle# = None
+        self.q_item: GraphicsCircle
 
-    def _create_graphics_for(self, child):
-        r = sqrt(child.total_area / pi)
-        q_item = Circle(r*GRAPHICS_RATIO)
-        if self.parent:
-            q_item.setParentItem(self.q_item)
+    def create_graphics(self):
+        q_item = GraphicsCircle(self)
+        if self.parent.is_root:
+            self.parent.q_scene.addItem(q_item)
         else:
-            self.q_scene.addItem(q_item)
-        q_item.setData(0, self)
-        q_item.setToolTip(child.name)
-        hue, sat = make_color_from(child.name)
-        q_item.setBrush(QColor.fromHsv(hue, sat, 255))
-        q_item.setPen(QColor.fromHsv(hue, sat, 239))
-        child.q_item = q_item
+            q_item.setParentItem(self.parent.q_item)
+        self.q_item = q_item
 
-    def create_graphics_for_children(self):
-        for child in self.children:
-            self._create_graphics_for(child)
-            child.q_item_move()
-
-    def q_item_move(self):
-        if not self.parent: return
-        r = sqrt(self.total_area / pi)
-        pos = [x*GRAPHICS_RATIO for x in self.position]
-        self.q_item.setPos(pos[0], pos[1], r*GRAPHICS_RATIO)
+    def q_item_move(self): self.q_item.setPos(*self.position)#, self.radius)
 
     def q_items_move(self):
+        '''
         for child in self.children:
             child.q_items_move()
-        self.q_item_move()
+            child.q_item_move()
+        '''
+        for descendant in self.descendants: descendant.q_item_move()
 
 
 class GraphicsModelMixin:
 
-    def __init__(self): self.q_scene = QGraphicsScene()
+    def __init__(self):
+        self.q_scene = QGraphicsScene()
