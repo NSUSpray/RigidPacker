@@ -2,11 +2,11 @@ from random import random
 from typing import List
 
 import pygame
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QObject
+from PyQt5.QtCore import QThread, pyqtSignal
 
 from storage import ItemData, Storage
-from model_body import BodyContainerMixin, BodyModelMixin
-from model_graphics import GraphicsContainerMixin, GraphicsModelMixin
+from model_body import BodyContainerMixin, BodyHierarchyMixin
+from model_graphics import GraphicsContainerMixin, GraphicsHierarchyMixin
 
 
 DEFAULT_TARGET_FPS = 60.077
@@ -68,33 +68,26 @@ class BodyGraphicsContainer(
             self.parent.adjust_area()
 
 
-class Model(
+class BodyGraphicsHierarchy(
         BodyGraphicsContainer,
-        BodyModelMixin,
-        GraphicsModelMixin,
-        QObject
+        BodyHierarchyMixin,
+        GraphicsHierarchyMixin
         ):
 
     ''' Has connection to the database and can stuff self recursively '''
-
-    updated = pyqtSignal()
 
     def __init__(self, storage, target_fps=DEFAULT_TARGET_FPS):
         super().__init__(storage.root, target_fps)
         self._storage: Storage = storage
         self._target_fps = target_fps
-        self._thread = ModelThread(self)
         self._radius: float
         self._total_mass: float
         self.descendants: List[BodyGraphicsContainer] = []
         self.hovered_item: BodyGraphicsContainer = None
-        self.gentle_mode = False
-        BodyModelMixin.__init__(self)
-        GraphicsModelMixin.__init__(self)
-        QObject.__init__(self)
+        BodyHierarchyMixin.__init__(self)
+        GraphicsHierarchyMixin.__init__(self)
         self.area = self.self_volume
         self.total_mass = self.self_mass
-        self.updated.connect(self.q_items_move)
 
     @property
     def position(self): return (0.0, 0.0)
@@ -121,42 +114,41 @@ class Model(
         for child in container.children: self.stuff(child)
         self.descendants += container.children
 
-    def run(self):
-        self._thread.start()
 
-    def stop(self):
-        self._thread.stop()
-        self._thread.wait()
+class Model(BodyGraphicsHierarchy, QThread):
 
-    def pause(self): self.gentle_mode = True
-    def resume(self): self.gentle_mode = False
+    updated = pyqtSignal()
 
-
-class ModelThread(QThread):
-
-    def __init__(self, model, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, storage, target_fps=DEFAULT_TARGET_FPS):
+        super().__init__(storage, target_fps)
+        QThread.__init__(self)
         pygame.init()
         self._clock = pygame.time.Clock()
-        self._model = model
         self._running: bool
+        self.gentle_mode = False
+        self.updated.connect(self.q_items_move)
 
     def __del__(self): pygame.quit()
 
     def run(self):
-        model = self._model
         self._running = True
         while self._running:
-            if model.gentle_mode:
-                if model.hovered_item:
-                    hovered = model.hovered_item
+            if self.gentle_mode:
+                if self.hovered_item:
+                    hovered = self.hovered_item
                     if hovered.children: hovered.b2subworld_step()
                     hovered.b2superworlds_step()
                 else:
-                    model.b2subworld_step()
+                    self.b2subworld_step()
             else:
-                model.b2subworlds_step()  # 20% CPU
-            model.updated.emit()  # 10% CPU
-            self._clock.tick(model._target_fps)
+                self.b2subworlds_step()  # 20% CPU
+            self.updated.emit()  # 10% CPU
+            self._clock.tick(self._target_fps)
 
-    def stop(self): self._running = False
+    def quit(self):
+        self._running = False
+        super().quit()
+        self.wait()
+
+    def pause(self): self.gentle_mode = True
+    def resume(self): self.gentle_mode = False

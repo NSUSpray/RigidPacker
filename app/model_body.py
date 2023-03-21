@@ -107,7 +107,7 @@ class BodyContainerMixin(BodyBase):
         self.parent.b2superworlds_step()
 
 
-class BodyModelMixin:
+class BodyHierarchyMixin:
 
     @property
     def b2world(self): return self.b2subworld

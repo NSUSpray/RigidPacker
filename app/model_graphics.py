@@ -82,7 +82,7 @@ class GraphicsContainerMixin:
         for descendant in self.descendants: descendant.q_item_move()
 
 
-class GraphicsModelMixin:
+class GraphicsHierarchyMixin:
 
     def __init__(self):
         self.q_scene = QGraphicsScene()
