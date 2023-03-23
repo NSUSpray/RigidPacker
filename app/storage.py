@@ -67,7 +67,4 @@ class Storage:
             AND arrangement_id IS ?
         ''', (item.id or None, self._arrangement_id))
         response = self._cursor.fetchall()
-        return [
-            ItemData(item_id, name, product_name)
-                for item_id, name, product_name in response
-            ]
+        return [ItemData(*fields) for fields in response]

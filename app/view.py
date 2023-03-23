@@ -13,3 +13,4 @@ class Ui_MainWindow:
         view.setSceneRect(-1, -1, 2, 2)  # always centered
         self.setCentralWidget(view)
         self._graphics_view = view
+        self.resize(800, 600)

@@ -73,7 +73,7 @@ class BodyContainerMixin(BodyBase):
         self.b2body.CreateCircleFixture(
             radius = sqrt(area/pi),
             friction = 1.0,
-            density = mass/area,
+            density = mass / area,
             restitution = 0.3
             )
         self.b2body.linearDamping = 1.0

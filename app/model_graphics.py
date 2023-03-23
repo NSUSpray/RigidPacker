@@ -54,8 +54,8 @@ class GraphicsCircle(QGraphicsEllipseItem):
         elif '0' <= c <= '9':
             hue = (ord(c) - ord('0'))/(ord('9') - ord('0'))*255
         else:
-            self.setBrush(QColor.white)
-        return self.setBrush(QColor.fromHsv(hue, sat, 255))
+            return self.setBrush(QColor.white)
+        self.setBrush(QColor.fromHsv(hue, sat, 255))
 
 
 class GraphicsContainerMixin:

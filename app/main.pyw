@@ -1,6 +1,4 @@
 #! python3.7
-import sys
-
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow
 
@@ -27,7 +25,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self._model.pause()
 
 
-app = QApplication(sys.argv)
+app = QApplication([])
 # storage = Storage('../../inventory.db')
 storage = Storage('../sample.db')
 model = Model(storage, target_fps=30.0385)
