@@ -1,5 +1,3 @@
-from math import pi, sqrt
-
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QGraphicsEllipseItem, QGraphicsScene
 from PyQt5.QtGui import QColor
@@ -25,20 +23,19 @@ class GraphicsCircle(QGraphicsEllipseItem):
         r *= GRAPHICS_RATIO
         self.setRect(-r, -r, 2.0*r, 2.0*r)  # left top width height
 
-    def setPos(self, x, y, r=None):
-        if r: self.setRadius(r)
+    def setPos(self, x, y):
         super().setPos(x*GRAPHICS_RATIO, y*GRAPHICS_RATIO)
 
     def hoverEnterEvent(self, event):
         self.setFlag(self.ItemClipsChildrenToShape, enabled=False)
-        # self._initial_pen = self.pen()
-        # self.setPen(Qt.gray)
+        self._initial_pen = self.pen()
+        self.setPen(Qt.darkGray)
         self._item.model.hovered_item = self._item
         self._item.pinch_body()
 
     def hoverLeaveEvent(self, event):
         self.setFlag(self.ItemClipsChildrenToShape)
-        # self.setPen(self._initial_pen)
+        self.setPen(self._initial_pen)
         self._item.model.hovered_item = None
         self._item.release_body()
 
@@ -70,19 +67,21 @@ class GraphicsContainerMixin:
         else:
             q_item.setParentItem(self.parent.q_item)
         self.q_item = q_item
+        self.q_item_move()
 
-    def q_item_move(self): self.q_item.setPos(*self.position)#, self.radius)
+    def q_item_move(self): self.q_item.setPos(*self.position)
 
+    '''
     def q_items_move(self):
-        '''
         for child in self.children:
             child.q_items_move()
             child.q_item_move()
-        '''
-        for descendant in self.descendants: descendant.q_item_move()
-
+    '''
 
 class GraphicsHierarchyMixin:
 
     def __init__(self):
         self.q_scene = QGraphicsScene()
+
+    def q_items_move(self):
+        for descendant in self.descendants: descendant.q_item_move()

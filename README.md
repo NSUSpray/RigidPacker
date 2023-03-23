@@ -14,6 +14,6 @@
 1. press `Space` to enable/disable gentle mode¹
 1. press `Escape` to quit
 
----
+────────
 
-<small><small>1. gentle mode – processing only children, siblings and ancestors of the body on which the mouse pointer is hovered</small></small>
+<sup>¹ Gentle mode – processing only children, siblings and ancestors of item on which the mouse pointer is hovered.</sup>

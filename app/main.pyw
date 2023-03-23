@@ -19,19 +19,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if event.key() == Qt.Key_Escape:
             self.close()
         elif event.key() == Qt.Key_Space:
-            if self._model.gentle_mode:
-                self._model.resume()
-            else:
-                self._model.pause()
+            self._model.toggle_gentle()
 
 
 app = QApplication([])
 # storage = Storage('../../inventory.db')
 storage = Storage('../sample.db')
-model = Model(storage, target_fps=30.0385)
-model.stuff()
+model = Model(storage, target_fps=30.0385, gentle=False)
 window = MainWindow(model)
-window.showMaximized()
 model.start()
+window.showMaximized()
+model.stuff()
 app.exec()
 model.quit()

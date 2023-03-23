@@ -1,12 +1,13 @@
-from random import random
 from typing import List
 
 import pygame
 from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtWidgets import QApplication
 
 from storage import ItemData, Storage
 from model_body import BodyContainerMixin, BodyHierarchyMixin
 from model_graphics import GraphicsContainerMixin, GraphicsHierarchyMixin
+# from geometry import intersected
 
 
 DEFAULT_TARGET_FPS = 60.077
@@ -39,53 +40,101 @@ class BodyGraphicsContainer(
 
     def stuff_by(self, items):
         super().stuff_by(items)
-        self.create_subworld()
+        self._create_subworld()
         for child in self.children:
             child.create_body()
-            r = 10.0 * self.radius
-            child.position = [2.0*r*random() - r for _ in range(2)]
-            child.create_graphics()
-            child.q_item_move()
-        self.adjust_total_mass()
         self.adjust_area()
-
-    def adjust_total_mass(self):
-        total_mass = self.self_mass
-        if self.children:
-            children_mass = sum(child.total_mass for child in self.children)
-            total_mass += children_mass
-        self.total_mass = total_mass
-        if self.parent: self.parent.adjust_total_mass()
+        self.adjust_total_mass()
+        for child in self.children:
+            child.throw_in()
+            child.create_graphics()
 
     def adjust_area(self):
+        ''' calculate area with all children and adjust parent area '''
         area = self.self_volume
         if self.children:
-            children_area = 1.62 * sum(child.area for child in self.children)
-            area += children_area
+            children_area = sum(child.area for child in self.children)
+            '''
+            children_area = 0.0
+            for child in self.children:
+                distance = hypot(*child.position)
+                intersected_ = intersected(child.radius, self.radius, distance)
+                children_area += child.area * intersected_
+            '''
+            area += 1.62 * children_area
         self.area = area
         if self.parent:
             self.q_item.setRadius(self.radius)
             self.parent.adjust_area()
 
 
-class BodyGraphicsHierarchy(
+class UpdatedHierarchyMixin(QThread):
+
+    updated = pyqtSignal()
+
+    def __init__(self, target_fps=DEFAULT_TARGET_FPS, gentle=False):
+        super().__init__()
+        pygame.init()
+        self._running: bool
+        self._target_fps = target_fps
+        self.gentle = gentle
+        self.updated.connect(self.q_items_move)
+
+    def __del__(self): pygame.quit()
+
+    def run(self):
+        b2subworld_step = self.b2subworld_step
+        b2subworlds_step = self.b2subworlds_step
+        updated_emit = self.updated.emit
+        target_fps = self._target_fps
+        clock = pygame.time.Clock()
+        tick = clock.tick
+        self._running = True
+        while self._running:
+            if self.gentle:
+                hovered = self.hovered_item
+                if hovered:
+                    if hovered.children: hovered.b2subworld_step()
+                    if hovered.parent: hovered.b2superworlds_step()
+                elif self.children:
+                    b2subworld_step()
+            elif self.children:
+                b2subworlds_step()  # 20% CPU
+            updated_emit()  # 10% CPU
+            tick(target_fps)
+
+    def quit(self):
+        self._running = False
+        super().quit()
+        self.wait()
+
+    def toggle_gentle(self): self.gentle = not self.gentle
+
+
+class Model(
         BodyGraphicsContainer,
         BodyHierarchyMixin,
-        GraphicsHierarchyMixin
+        GraphicsHierarchyMixin,
+        UpdatedHierarchyMixin
         ):
 
     ''' Has connection to the database and can stuff self recursively '''
 
-    def __init__(self, storage, target_fps=DEFAULT_TARGET_FPS):
+    def __init__(
+            self,
+            storage,
+            target_fps = DEFAULT_TARGET_FPS,
+            gentle = False
+            ):
         super().__init__(storage.root, target_fps)
         self._storage: Storage = storage
-        self._target_fps = target_fps
         self._radius: float
         self._total_mass: float
         self.descendants: List[BodyGraphicsContainer] = []
         self.hovered_item: BodyGraphicsContainer = None
         BodyHierarchyMixin.__init__(self)
         GraphicsHierarchyMixin.__init__(self)
+        UpdatedHierarchyMixin.__init__(self, target_fps, gentle)
         self.area = self.self_volume
         self.total_mass = self.self_mass
 
@@ -103,52 +152,15 @@ class BodyGraphicsHierarchy(
     def total_mass(self, mass): self._total_mass = mass
 
     def stuff(self, container=None):
+        ''' create and place all container’s descendants '''
         container = container or self
-        container.model = self
         protos = self._storage.children_of(container)
         if not protos: return
         children = [
             BodyGraphicsContainer(proto, self._target_fps) for proto in protos
             ]
+        for child in children: child.model = self
         container.stuff_by(children)
-        for child in container.children: self.stuff(child)
+        QApplication.processEvents()
         self.descendants += container.children
-
-
-class Model(BodyGraphicsHierarchy, QThread):
-
-    updated = pyqtSignal()
-
-    def __init__(self, storage, target_fps=DEFAULT_TARGET_FPS):
-        super().__init__(storage, target_fps)
-        QThread.__init__(self)
-        pygame.init()
-        self._clock = pygame.time.Clock()
-        self._running: bool
-        self.gentle_mode = False
-        self.updated.connect(self.q_items_move)
-
-    def __del__(self): pygame.quit()
-
-    def run(self):
-        self._running = True
-        while self._running:
-            if self.gentle_mode:
-                if self.hovered_item:
-                    hovered = self.hovered_item
-                    if hovered.children: hovered.b2subworld_step()
-                    hovered.b2superworlds_step()
-                else:
-                    self.b2subworld_step()
-            else:
-                self.b2subworlds_step()  # 20% CPU
-            self.updated.emit()  # 10% CPU
-            self._clock.tick(self._target_fps)
-
-    def quit(self):
-        self._running = False
-        super().quit()
-        self.wait()
-
-    def pause(self): self.gentle_mode = True
-    def resume(self): self.gentle_mode = False
+        for child in container.children: self.stuff(child)
