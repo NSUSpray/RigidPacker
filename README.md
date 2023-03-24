@@ -12,6 +12,7 @@
 ## Using
 1. run *main.pyw*
 1. press `Space` to enable/disable gentle mode¹
+1. shuffle items by dragging with mouse
 1. press `Escape` to quit
 
 ────────

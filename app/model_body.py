@@ -10,6 +10,8 @@ class BodyBase:
 
     def __init__(self):
         self.b2body: b2Body
+        self.drag_point = (0.0, 0.0)
+        self.drag_target = None
 
     @property
     def position(self): return self.b2body.position
@@ -97,14 +99,28 @@ class BodyContainerMixin(BodyBase):
     def b2subworld_step(self):
         parent_radius = self.radius
         for child in self.children:
-            distance = hypot(*child.position)  # between centers
-            if distance == 0.0: continue
-            outersected_ = outersected(child.radius, parent_radius, distance)
-            if not outersected_: continue
-            r = child.radius
-            factor = -500 * outersected_ * r*r / distance
-            f = [x*factor for x in child.position]
-            child.b2body.ApplyForce(force=f, point=(0.0,0.0), wake=False)
+            position = child.position
+            body = child.b2body
+            # rake in
+            radius = child.radius
+            distance = hypot(*position)  # between centers
+            outersected_ = outersected(radius, parent_radius, distance)
+            if outersected_:
+                factor = -500 * outersected_ * radius*radius / distance
+                force = [pos*factor for pos in position]
+                point = (0.0, 0.0)  # TODO: touchpoint
+                body.ApplyForce(force=force, point=point, wake=False)
+            # drag
+            drag_target = child.drag_target
+            if drag_target:
+                # factor = -10 / child.total_mass
+                factor = -10 / sqrt(child.total_mass)
+                # factor = -10
+                velocity = [
+                    (point + pos - target)*factor for point, target, pos
+                        in zip(child.drag_point, drag_target, position)
+                    ]
+                body.linearVelocity = velocity
         self.b2subworld.Step(self._time_step, 10, 10)
 
     def b2subworlds_step(self):

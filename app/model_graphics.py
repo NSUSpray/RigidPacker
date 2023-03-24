@@ -15,7 +15,7 @@ class GraphicsCircle(QGraphicsEllipseItem):
         self.setPen(Qt.transparent)
         self._fill()
         # self.setToolTip(str(item))
-        # self.setFlag(self.ItemIsMovable)
+        self.setFlag(self.ItemIsMovable)
         self.setFlag(self.ItemClipsChildrenToShape)
         self.setAcceptHoverEvents(True)
 
@@ -38,6 +38,19 @@ class GraphicsCircle(QGraphicsEllipseItem):
         self.setPen(self._initial_pen)
         self._item.model.hovered_item = None
         self._item.release_body()
+
+    def mousePressEvent(self, event):
+        pos = event.pos()
+        self._item.drag_point = [x/GRAPHICS_RATIO for x in (pos.x(),pos.y())]
+        self._item.release_body()
+
+    def mouseReleaseEvent(self, event):
+        self._item.drag_target = None
+        # if self.isUnderMouse(): self._item.pinch_body()
+
+    def mouseMoveEvent(self, event):
+        pos = self.mapToParent(event.pos())
+        self._item.drag_target = [x/GRAPHICS_RATIO for x in (pos.x(),pos.y())]
 
     def _fill(self):
         name = self._item.name
