@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QApplication
 from storage import ItemData, Storage
 from model_body import BodyContainerMixin, BodyHierarchyMixin
 from model_graphics import GraphicsContainerMixin, GraphicsHierarchyMixin
-# from geometry import intersected
+from geometry import enclosing_area_ratio
 
 
 DEFAULT_TARGET_FPS = 60.077
@@ -53,15 +53,16 @@ class BodyGraphicsContainer(
         ''' calculate area with all children and adjust parent area '''
         area = self.self_volume
         if self.children:
+            children_len = len(self.children)
             children_area = sum(child.area for child in self.children)
-            '''
-            children_area = 0.0
-            for child in self.children:
-                distance = hypot(*child.position)
-                intersected_ = intersected(child.radius, self.radius, distance)
-                children_area += child.area * intersected_
-            '''
-            area += 1.62 * children_area
+            if children_len == 1:
+                area += children_area
+            else:
+                area1 = area + children_area
+                area2 = enclosing_area_ratio(
+                    [child.radius for child in self.children]
+                    ) * children_area
+                area = max(area1, area2)
         self.area = area
         if self.parent:
             self.q_item.setRadius(self.radius)
