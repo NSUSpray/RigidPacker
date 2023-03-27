@@ -91,11 +91,17 @@ class BodyContainerMixin(BodyBase):
         self.b2body = b2body
 
     def throw_in(self):
-        L = self.parent.radius + self.radius
-        a = 2.0*pi * random()
-        Lsa, Lca = L*sin(a), L*cos(a)
-        self.position = Lca, Lsa
-        self.b2body.linearVelocity = -Lca, -Lsa
+        distance = self.parent.radius + self.radius
+        azimuth = 2*pi * random()
+        cos_sin = (cos, sin)
+        start_position = [distance*f(azimuth) for f in cos_sin]
+        throw_in_angle = pi/2 * (random() - 0.5)
+        velocity = [
+            -2.0 * xy * f(throw_in_angle)
+                for xy, f in zip(start_position, cos_sin)
+            ]
+        self.position = start_position
+        self.b2body.linearVelocity = velocity
 
     def b2subworld_step(self):
         parent_radius = self.radius
