@@ -15,8 +15,12 @@ class GraphicsCircle(QGraphicsEllipseItem):
         self.setPen(Qt.transparent)
         self._fill()
         # self.setToolTip(str(item))
-        self.setFlag(self.ItemIsMovable)
-        self.setFlag(self.ItemClipsChildrenToShape)
+        self.setFlags(0
+            | self.ItemIsMovable
+            # | self.ItemClipsToShape
+            | self.ItemClipsChildrenToShape
+            | self.ItemContainsChildrenInShape
+            )
         self.setAcceptHoverEvents(True)
 
     def setRadius(self, r):
@@ -27,30 +31,40 @@ class GraphicsCircle(QGraphicsEllipseItem):
         super().setPos(x*GRAPHICS_RATIO, y*GRAPHICS_RATIO)
 
     def hoverEnterEvent(self, event):
+        # self.setFlag(self.ItemClipsToShape)
         self.setFlag(self.ItemClipsChildrenToShape, enabled=False)
-        self._initial_pen = self.pen()
+        self.setFlag(self.ItemContainsChildrenInShape, enabled=False)
+        # for child in self._item.children:
+        #     child.q_item.setFlag(self.ItemClipsToShape)
+        self._last_pen = self.pen()
         self.setPen(Qt.darkGray)
         self._item.model.hovered_item = self._item
         self._item.pinch_body()
+        self.setZValue(1)
 
     def hoverLeaveEvent(self, event):
+        # self.setFlag(self.ItemClipsToShape, enabled=False)
         self.setFlag(self.ItemClipsChildrenToShape)
-        self.setPen(self._initial_pen)
+        self.setFlag(self.ItemContainsChildrenInShape)
+        # for child in self._item.children:
+        #     child.q_item.setFlag(self.ItemClipsToShape, enabled=False)
+        self.setPen(self._last_pen)
         self._item.model.hovered_item = None
         self._item.release_body()
+        self.setZValue(0)
 
     def mousePressEvent(self, event):
         pos = event.pos()
         self._item.drag_point = [x/GRAPHICS_RATIO for x in (pos.x(),pos.y())]
-        self._item.release_body()
 
     def mouseReleaseEvent(self, event):
         self._item.drag_target = None
-        # if self.isUnderMouse(): self._item.pinch_body()
+        self._item.pinch_body()
 
     def mouseMoveEvent(self, event):
         pos = self.mapToParent(event.pos())
         self._item.drag_target = [x/GRAPHICS_RATIO for x in (pos.x(),pos.y())]
+        self._item.release_body(calm=True)
 
     def _fill(self):
         name = self._item.name

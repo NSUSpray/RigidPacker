@@ -56,8 +56,13 @@ class BodyBase:
         self._fixture.density = density
         self.b2body.ResetMassData()
 
-    def pinch_body(self): self.b2body.type = b2_staticBody
-    def release_body(self): self.b2body.type = b2_dynamicBody
+    def pinch_body(self):
+        self._last_velocity = self.b2body.linearVelocity.copy()
+        self.b2body.type = b2_staticBody
+
+    def release_body(self, calm=False):
+        self.b2body.type = b2_dynamicBody
+        if not calm: self.b2body.linearVelocity = self._last_velocity
 
 
 class BodyContainerMixin(BodyBase):
