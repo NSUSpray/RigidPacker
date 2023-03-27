@@ -23,12 +23,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
 app = QApplication([])
-# storage = Storage('../../inventory.db')
 storage = Storage('../sample.db')
-model = Model(storage, target_fps=30.0385, gentle=False)
+model = Model(storage, target_fps=30.0385)
 window = MainWindow(model)
 model.start()
 window.showMaximized()
-model.stuff()
+model.stuff()  # 15–18% CPU
 app.exec()
 model.quit()

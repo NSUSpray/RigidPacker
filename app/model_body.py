@@ -1,4 +1,4 @@
-from math import pi, sqrt, hypot, sin, cos
+from math import pi, sqrt, sin, cos
 from random import random
 
 from Box2D import b2World, b2Body, b2_staticBody, b2_dynamicBody
@@ -76,18 +76,19 @@ class BodyContainerMixin(BodyBase):
         self.b2subworld = b2World(gravity=(0.0,0.0))
 
     def create_body(self):
-        self.b2body = self.parent.b2subworld.CreateDynamicBody()
+        b2body = self.parent.b2subworld.CreateDynamicBody()
         mass = self.self_mass
         area = self.self_volume
-        self.b2body.CreateCircleFixture(
+        b2body.CreateCircleFixture(
             radius = sqrt(area/pi),
             friction = 1.0,
             density = mass / area,
             restitution = 0.3
             )
-        self.b2body.linearDamping = 1.0
-        self.b2body.angularDamping = 1.0
-        self.b2body.userData = self
+        b2body.linearDamping = 1.0
+        b2body.angularDamping = 1.0
+        b2body.userData = self
+        self.b2body = b2body
 
     def throw_in(self):
         L = self.parent.radius + self.radius
@@ -103,19 +104,19 @@ class BodyContainerMixin(BodyBase):
             body = child.b2body
             # rake in
             radius = child.radius
-            distance = hypot(*position)  # between centers
+            distance = position.length  # between centers
             outersected_ = outersected(radius, parent_radius, distance)
             if outersected_:
-                factor = -500 * outersected_ * radius*radius / distance
+                factor = -1000.0*outersected_ * radius*radius / distance
                 force = [pos*factor for pos in position]
                 point = (0.0, 0.0)  # TODO: touchpoint
                 body.ApplyForce(force=force, point=point, wake=False)
             # drag
             drag_target = child.drag_target
             if drag_target:
-                # factor = -10 / child.total_mass
-                factor = -10 / sqrt(child.total_mass)
-                # factor = -10
+                factor = -10.0 / child.total_mass  # real inertia
+                # factor = -10.0 / sqrt(child.total_mass)  # compromise
+                # factor = -10.0  # best dynamism
                 velocity = [
                     (point + pos - target)*factor for point, target, pos
                         in zip(child.drag_point, drag_target, position)
@@ -134,15 +135,6 @@ class BodyContainerMixin(BodyBase):
     def b2superworlds_step(self):
         self.b2superworld_step()
         if self.parent.parent: self.parent.b2superworlds_step()
-
-    def adjust_total_mass(self):
-        ''' calculate mass with all children and adjust parent mass '''
-        total_mass = self.self_mass
-        if self.children:
-            children_mass = sum(child.total_mass for child in self.children)
-            total_mass += children_mass
-        self.total_mass = total_mass
-        if self.parent: self.parent.adjust_total_mass()
 
 
 class BodyHierarchyMixin:

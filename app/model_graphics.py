@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QGraphicsEllipseItem, QGraphicsScene
 from PyQt5.QtGui import QColor
 
 
-GRAPHICS_RATIO = 200.0
+GRAPHICS_RATIO = 250.0
 
 
 class GraphicsCircle(QGraphicsEllipseItem):

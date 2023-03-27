@@ -7,10 +7,7 @@ from PyQt5.QtWidgets import QApplication
 from storage import ItemData, Storage
 from model_body import BodyContainerMixin, BodyHierarchyMixin
 from model_graphics import GraphicsContainerMixin, GraphicsHierarchyMixin
-from geometry import enclosing_area_ratio
-
-
-DEFAULT_TARGET_FPS = 60.077
+from geometry import packing_specific_area
 
 
 class ContainerItem(ItemData):
@@ -33,7 +30,7 @@ class BodyGraphicsContainer(
 
     # shape area ~ real item volume
 
-    def __init__(self, item, target_fps=DEFAULT_TARGET_FPS):
+    def __init__(self, item, target_fps):
         super().__init__(item.id, item.name, item.product_name)
         BodyContainerMixin.__init__(self, target_fps)
         GraphicsContainerMixin.__init__(self)
@@ -59,7 +56,7 @@ class BodyGraphicsContainer(
                 area += children_area
             else:
                 area1 = area + children_area
-                area2 = enclosing_area_ratio(
+                area2 = packing_specific_area(
                     [child.radius for child in self.children]
                     ) * children_area
                 area = max(area1, area2)
@@ -68,17 +65,26 @@ class BodyGraphicsContainer(
             self.q_item.setRadius(self.radius)
             self.parent.adjust_area()
 
+    def adjust_total_mass(self):
+        ''' calculate mass with all children and adjust parent mass '''
+        total_mass = self.self_mass
+        if self.children:
+            children_mass = sum(child.total_mass for child in self.children)
+            total_mass += children_mass
+        self.total_mass = total_mass
+        if self.parent: self.parent.adjust_total_mass()
+
 
 class UpdatedHierarchyMixin(QThread):
 
     updated = pyqtSignal()
 
-    def __init__(self, target_fps=DEFAULT_TARGET_FPS, gentle=False):
+    def __init__(self, target_fps):
         super().__init__()
         pygame.init()
         self._running: bool
         self._target_fps = target_fps
-        self.gentle = gentle
+        self.gentle = False
         self.updated.connect(self.q_items_move)
 
     def __del__(self): pygame.quit()
@@ -100,8 +106,8 @@ class UpdatedHierarchyMixin(QThread):
                 elif self.children:
                     b2subworld_step()
             elif self.children:
-                b2subworlds_step()  # 20% CPU
-            updated_emit()  # 10% CPU
+                b2subworlds_step()  # 25–13% CPU
+            updated_emit()  # 17–5% CPU
             tick(target_fps)
 
     def quit(self):
@@ -121,12 +127,7 @@ class Model(
 
     ''' Has connection to the database and can stuff self recursively '''
 
-    def __init__(
-            self,
-            storage,
-            target_fps = DEFAULT_TARGET_FPS,
-            gentle = False
-            ):
+    def __init__(self, storage, target_fps):
         super().__init__(storage.root, target_fps)
         self._storage: Storage = storage
         self._radius: float
@@ -135,7 +136,7 @@ class Model(
         self.hovered_item: BodyGraphicsContainer = None
         BodyHierarchyMixin.__init__(self)
         GraphicsHierarchyMixin.__init__(self)
-        UpdatedHierarchyMixin.__init__(self, target_fps, gentle)
+        UpdatedHierarchyMixin.__init__(self, target_fps)
         self.area = self.self_volume
         self.total_mass = self.self_mass
 

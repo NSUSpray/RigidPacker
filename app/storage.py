@@ -15,7 +15,7 @@ class ItemDataBase:
 @dataclass
 class PhysicalItemDataMixin:
     self_mass: float = 1.0
-    self_volume: float = 4/3 * pi * (0.1)**3
+    self_volume: float = 4/3*pi * (0.1)**3
 
 
 @dataclass

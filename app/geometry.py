@@ -1,4 +1,6 @@
-ENCLOSING_AREA_RATIO = {  # upper bounds
+# specific area = 1 / density
+# https://en.wikipedia.org/wiki/Circle_packing_in_a_circle
+PACKING_SPECIFIC_AREA = {
     # 1: 1.0,
     # 2: 2.0,
     3: 1.547578137,
@@ -18,8 +20,8 @@ ENCLOSING_AREA_RATIO = {  # upper bounds
     17: 1.351344059,
     # 18: 1.314200547,
     # 19: 1.245032098,
-    # 20: 1.31225645
-}
+    # 20: 1.31225645,
+    }
 
 
 def outersected(child_radius, parent_radius, distance):
@@ -38,15 +40,15 @@ def intersected(child_radius, parent_radius, distance):
     return max(depth/diameter, 0.0)
 
 
-def enclosing_area_ratio(radii):
+def packing_specific_area(radii):
     '''
-    Returns the ratio of enclosing circle’s area to the total area of enclosed
-    circles. https://en.wikipedia.org/wiki/Circle_packing_in_a_circle
+    Returns the ratio of enclosing circle’s sufficient area
+    to the enclosed circles total area.
     '''
     number = len(radii)
     if number == 2:
         # exact solution
-        ratio = radii[1] / radii[0]
-        return 1 + 2*ratio/(1 + ratio*ratio)
-    if number > 17: return ENCLOSING_AREA_RATIO[17]  # upper bound
-    return ENCLOSING_AREA_RATIO[number]
+        return sum(radii)**2 / sum(r*r for r in radii) 
+    if number <= 17: return PACKING_SPECIFIC_AREA[number]
+    # lower bound for all remaining
+    return PACKING_SPECIFIC_AREA[17]
