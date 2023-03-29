@@ -11,10 +11,6 @@
 
 ## Using
 1. run *main.pyw*
-1. press `Space` to enable/disable gentle mode¹
 1. shuffle items by dragging with mouse
+1. right click to pick up items
 1. press `Escape` to quit
-
-────────
-
-<sup>¹ Gentle mode – processing only children, siblings and ancestors of item on which the mouse pointer is hovered.</sup>

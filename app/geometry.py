@@ -1,6 +1,6 @@
 # specific area = 1 / density
 # https://en.wikipedia.org/wiki/Circle_packing_in_a_circle
-PACKING_SPECIFIC_AREA = {
+_PACKING_SPECIFIC_AREA = {
     # 1: 1.0,
     # 2: 2.0,
     3: 1.547578137,
@@ -49,6 +49,6 @@ def packing_specific_area(radii):
     if number == 2:
         # exact solution
         return sum(radii)**2 / sum(r*r for r in radii) 
-    if number <= 17: return PACKING_SPECIFIC_AREA[number]
+    if number <= 17: return _PACKING_SPECIFIC_AREA[number]
     # lower bound for all remaining
-    return PACKING_SPECIFIC_AREA[17]
+    return _PACKING_SPECIFIC_AREA[17]

@@ -1,4 +1,5 @@
 from typing import List
+from math import pi
 
 import pygame
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -10,38 +11,58 @@ from model_graphics import GraphicsContainerMixin, GraphicsHierarchyMixin
 from geometry import packing_specific_area
 
 
-class ContainerItem(ItemData):
+class _ContainerItem(ItemData):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.parent: ContainerItem = None
-        self.children: List[ContainerItem] = []
+        self.parent: _ContainerItem = None
+        self.children: List[_ContainerItem] = []
+        self.ancestors: List[_ContainerItem] = []
+        self.descendants: List[_ContainerItem] = []
+
+    '''
+    @property
+    def ancestors(self):
+        return (self.parent, *self.parent.ancestors) if self.parent else ()
+        # yield self.parent or ()
+        # for ancestor in self.parent.ancestors: yield ancestor
+    '''
 
     def stuff_by(self, items):
+        for item in items: item.parent = self
         self.children = items
-        for child in self.children: child.parent = self
+        for item in items:
+            item.ancestors = [self, *self.ancestors]
+        for item in (self, *self.ancestors):
+            item.descendants += items
 
 
-class BodyGraphicsContainer(
-        ContainerItem,
+class _BodyGraphicsContainer(
         BodyContainerMixin,
-        GraphicsContainerMixin
+        GraphicsContainerMixin,
+        _ContainerItem,
         ):
 
     # shape area ~ real item volume
 
     def __init__(self, item, target_fps):
-        super().__init__(item.id, item.name, item.product_name)
-        BodyContainerMixin.__init__(self, target_fps)
+        _ContainerItem.__init__(self, item.id, item.name, item.product_name)
+        BodyContainerMixin.__init__(self, 1.0/target_fps)
         GraphicsContainerMixin.__init__(self)
+        self._picked_up = False
+        self.model: Model
+        self.self_and_desc_with_children: List[_BodyGraphicsContainer] = [self]
 
     def stuff_by(self, items):
         super().stuff_by(items)
+        for ancestor in self.ancestors:
+            ancestor.self_and_desc_with_children.append(self)
         self._create_subworld()
         for child in self.children:
             child.create_body()
-        self.adjust_area()
-        self.adjust_total_mass()
+        for item in (self, *self.ancestors):
+            item.adjust_area()
+            item.adjust_total_mass()
         for child in self.children:
             child.throw_in()
             child.create_graphics()
@@ -55,15 +76,14 @@ class BodyGraphicsContainer(
             if children_len == 1:
                 area += children_area
             else:
+                radii = sorted([child.radius for child in self.children])
                 area1 = area + children_area
-                area2 = packing_specific_area(
-                    [child.radius for child in self.children]
-                    ) * children_area
-                area = max(area1, area2)
+                area2 = packing_specific_area(radii) * children_area
+                top2radii = sum(radii[-2:])
+                area3 = pi * top2radii*top2radii
+                area = max(area1, area2, area3)
         self.area = area
-        if self.parent:
-            self.q_item.setRadius(self.radius)
-            self.parent.adjust_area()
+        if self.parent: self.q_item.setRadius(self.radius)
 
     def adjust_total_mass(self):
         ''' calculate mass with all children and adjust parent mass '''
@@ -72,10 +92,40 @@ class BodyGraphicsContainer(
             children_mass = sum(child.total_mass for child in self.children)
             total_mass += children_mass
         self.total_mass = total_mass
-        if self.parent: self.parent.adjust_total_mass()
+
+    def pinch(self):
+        self.model.hovered_item = self
+        self._pinch_body()
+        self.q_item.paint_pinched()
+
+    def release(self):
+        self.model.hovered_item = None
+        self._release_body()
+        self.q_item.paint_released()
+
+    def start_dragging(self, drag_point):
+        self.drag_point = drag_point
+        self.b2body.bullet = True
+
+    def drag(self, drag_target):
+        self.drag_target = drag_target
+        self._release_body_calmly()
+
+    def finish_dragging(self):
+        self.drag_target = None
+        self.b2body.bullet = False
+        self.pinch()
+
+    def toggle_picked_up(self):
+        if self._picked_up:
+            self.q_item.paint_dropped()
+        else:
+            self._release_body()
+            self.q_item.paint_picked_up()
+        self._picked_up = not self._picked_up
 
 
-class UpdatedHierarchyMixin(QThread):
+class _UpdatableHierarchyMixin(QThread):
 
     updated = pyqtSignal()
 
@@ -93,22 +143,25 @@ class UpdatedHierarchyMixin(QThread):
         b2subworld_step = self.b2subworld_step
         b2subworlds_step = self.b2subworlds_step
         updated_emit = self.updated.emit
-        target_fps = self._target_fps
         clock = pygame.time.Clock()
         tick = clock.tick
         self._running = True
+        while self._running and not self.children:
+            tick(self.target_fps)
         while self._running:
+            '''
             if self.gentle:
                 hovered = self.hovered_item
                 if hovered:
                     if hovered.children: hovered.b2subworld_step()
                     if hovered.parent: hovered.b2superworlds_step()
-                elif self.children:
+                else:
                     b2subworld_step()
-            elif self.children:
-                b2subworlds_step()  # 25–13% CPU
+            else:
+            '''
+            b2subworlds_step()  # 25–13% CPU
             updated_emit()  # 17–5% CPU
-            tick(target_fps)
+            tick(self.target_fps)
 
     def quit(self):
         self._running = False
@@ -119,39 +172,30 @@ class UpdatedHierarchyMixin(QThread):
 
 
 class Model(
-        BodyGraphicsContainer,
         BodyHierarchyMixin,
         GraphicsHierarchyMixin,
-        UpdatedHierarchyMixin
+        _BodyGraphicsContainer,
+        _UpdatableHierarchyMixin,
         ):
 
     ''' Has connection to the database and can stuff self recursively '''
 
     def __init__(self, storage, target_fps):
-        super().__init__(storage.root, target_fps)
-        self._storage: Storage = storage
-        self._radius: float
-        self._total_mass: float
-        self.descendants: List[BodyGraphicsContainer] = []
-        self.hovered_item: BodyGraphicsContainer = None
+        _BodyGraphicsContainer.__init__(self, storage.root, target_fps)
         BodyHierarchyMixin.__init__(self)
         GraphicsHierarchyMixin.__init__(self)
-        UpdatedHierarchyMixin.__init__(self, target_fps)
-        self.area = self.self_volume
-        self.total_mass = self.self_mass
+        _UpdatableHierarchyMixin.__init__(self, target_fps)
+        self._storage: Storage = storage
+        self.hovered_item: _BodyGraphicsContainer = None
 
     @property
-    def position(self): return (0.0, 0.0)
+    def target_fps(self):
+        return self._target_fps
 
-    @property
-    def radius(self): return self._radius
-    @radius.setter
-    def radius(self, radius): self._radius = radius
-
-    @property
-    def total_mass(self): return self._total_mass
-    @total_mass.setter
-    def total_mass(self, mass): self._total_mass = mass
+    @target_fps.setter
+    def target_fps(self, fps):
+        self._target_fps = fps
+        self._set_time_step(1.0/fps)
 
     def stuff(self, container=None):
         ''' create and place all container’s descendants '''
@@ -159,10 +203,9 @@ class Model(
         protos = self._storage.children_of(container)
         if not protos: return
         children = [
-            BodyGraphicsContainer(proto, self._target_fps) for proto in protos
+            _BodyGraphicsContainer(proto, self._target_fps) for proto in protos
             ]
         for child in children: child.model = self
         container.stuff_by(children)
         QApplication.processEvents()
-        self.descendants += container.children
         for child in container.children: self.stuff(child)

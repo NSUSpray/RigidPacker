@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class ItemDataBase:
+class _ItemDataBase:
     id: int
     name: str
     product_name: str = ''
@@ -13,13 +13,13 @@ class ItemDataBase:
 
 
 @dataclass
-class PhysicalItemDataMixin:
+class _PhysicalItemDataMixin:
     self_mass: float = 1.0
     self_volume: float = 4/3*pi * (0.1)**3
 
 
 @dataclass
-class ItemData(PhysicalItemDataMixin, ItemDataBase):
+class ItemData(_PhysicalItemDataMixin, _ItemDataBase):
     ''' Represents data transfer objects (DTO). Contains only database data '''
 
 

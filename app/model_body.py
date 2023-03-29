@@ -6,12 +6,13 @@ from Box2D import b2World, b2Body, b2_staticBody, b2_dynamicBody
 from geometry import outersected
 
 
-class BodyBase:
+_ZERO_VECTOR = (0.0, 0.0)
+
+
+class _BodyBase:
 
     def __init__(self):
         self.b2body: b2Body
-        self.drag_point = (0.0, 0.0)
-        self.drag_target = None
 
     @property
     def position(self): return self.b2body.position
@@ -56,20 +57,42 @@ class BodyBase:
         self._fixture.density = density
         self.b2body.ResetMassData()
 
-    def pinch_body(self):
+
+class _InteractiveBodyMixin:
+
+    def __init__(self):
+        self._last_velocity = _ZERO_VECTOR
+        self.drag_point = _ZERO_VECTOR
+        self.drag_target = None
+
+    def _pinch_body(self):
         self._last_velocity = self.b2body.linearVelocity.copy()
         self.b2body.type = b2_staticBody
 
-    def release_body(self, calm=False):
+    def _release_body(self):
         self.b2body.type = b2_dynamicBody
-        if not calm: self.b2body.linearVelocity = self._last_velocity
+        self.b2body.linearVelocity = self._last_velocity
+
+    def _release_body_calmly(self):
+        self.b2body.type = b2_dynamicBody
+
+    def drag_body(self):
+        factor = -10.0 / self.total_mass  # real inertia
+        # factor = -10.0 / sqrt(self.total_mass)  # compromise
+        # factor = -10.0  # best dynamism
+        velocity = [
+            (point + pos - target)*factor for point, target, pos
+                in zip(self.drag_point, self.drag_target, self.position)
+            ]
+        self.b2body.linearVelocity = velocity
 
 
-class BodyContainerMixin(BodyBase):
+class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
 
-    def __init__(self, target_fps):
+    def __init__(self, time_step):
         super().__init__()
-        self._time_step = 1.0 / target_fps
+        _InteractiveBodyMixin.__init__(self)
+        self.time_step = time_step
         self.b2subworld: b2World
 
     @property
@@ -88,7 +111,7 @@ class BodyContainerMixin(BodyBase):
             radius = sqrt(area/pi),
             friction = 1.0,
             density = mass / area,
-            restitution = 0.3
+            restitution = 0.3,
             )
         b2body.linearDamping = 1.0
         b2body.angularDamping = 1.0
@@ -108,47 +131,66 @@ class BodyContainerMixin(BodyBase):
         self.position = start_position
         self.b2body.linearVelocity = velocity
 
+    def rake_in(self, outersected_):
+        radius = self.radius
+        position = self.position
+        factor = -3000.0*outersected_ * radius*radius / position.length
+        force = [pos*factor for pos in position]
+        # point = (0.0, 0.0)  # TODO: touchpoint
+        self.b2body.ApplyForce(force=force, point=_ZERO_VECTOR, wake=False)
+
     def b2subworld_step(self):
         parent_radius = self.radius
         for child in self.children:
-            position = child.position
-            body = child.b2body
-            # rake in
-            radius = child.radius
-            distance = position.length  # between centers
-            outersected_ = outersected(radius, parent_radius, distance)
-            if outersected_:
-                factor = -1000.0*outersected_ * radius*radius / distance
-                force = [pos*factor for pos in position]
-                point = (0.0, 0.0)  # TODO: touchpoint
-                body.ApplyForce(force=force, point=point, wake=False)
-            # drag
-            drag_target = child.drag_target
-            if drag_target:
-                factor = -10.0 / child.total_mass  # real inertia
-                # factor = -10.0 / sqrt(child.total_mass)  # compromise
-                # factor = -10.0  # best dynamism
-                velocity = [
-                    (point + pos - target)*factor for point, target, pos
-                        in zip(child.drag_point, drag_target, position)
-                    ]
-                body.linearVelocity = velocity
-        self.b2subworld.Step(self._time_step, 10, 10)
+            outersected_ = outersected(
+                child.radius, parent_radius, child.position.length
+                )
+            if outersected_: child.rake_in(outersected_)
+            if child.drag_target: child.drag_body()
+        self.b2subworld.Step(self.time_step, 10, 10)
 
     def b2subworlds_step(self):
+        '''
         for child in self.children:
             if not child.children: continue
             child.b2subworlds_step()
         self.b2subworld_step()
+        '''
+        for item in self.self_and_desc_with_children:
+            item.b2subworld_step()
 
     def b2superworld_step(self): self.parent.b2subworld_step()
 
     def b2superworlds_step(self):
+        '''
         self.b2superworld_step()
         if self.parent.parent: self.parent.b2superworlds_step()
+        '''
+        for ancestor in self.ancestors:
+            ancestor.b2subworld_step()
 
 
 class BodyHierarchyMixin:
 
+    def __init__(self):
+        self._radius: float
+        self._total_mass: float
+        self.area = self.self_volume
+        self.total_mass = self.self_mass
+
+    def _set_time_step(self, time_step):
+        for descendant in self.descendants:
+            descendant.time_step = time_step
+
     @property
-    def b2world(self): return self.b2subworld
+    def position(self): return _ZERO_VECTOR
+
+    @property
+    def radius(self): return self._radius
+    @radius.setter
+    def radius(self, radius): self._radius = radius
+
+    @property
+    def total_mass(self): return self._total_mass
+    @total_mass.setter
+    def total_mass(self, mass): self._total_mass = mass
