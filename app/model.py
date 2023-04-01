@@ -2,7 +2,7 @@ from typing import List
 from math import pi
 
 import pygame
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
 
 from storage import ItemData, Storage
@@ -17,6 +17,7 @@ class _ContainerItem(ItemData):
         super().__init__(*args, **kwargs)
         self.parent: _ContainerItem = None
         self.children: List[_ContainerItem] = []
+        # needed for a marginal increase in performance in the main loop
         self.ancestors: List[_ContainerItem] = []
         self.descendants: List[_ContainerItem] = []
 
@@ -28,13 +29,31 @@ class _ContainerItem(ItemData):
         # for ancestor in self.parent.ancestors: yield ancestor
     '''
 
-    def stuff_by(self, items):
-        for item in items: item.parent = self
-        self.children = items
-        for item in items:
-            item.ancestors = [self, *self.ancestors]
-        for item in (self, *self.ancestors):
-            item.descendants += items
+    @property
+    def nesting_level(self):
+        return self.parent.nesting_level + 1 if self.parent else 0
+
+    def stuff_by(self, new_children):
+        self.children += new_children  # +C
+        self_and_ancestors = (self, *self.ancestors)
+        for new_child in new_children:
+            new_child.parent = self  # +P
+            new_child_and_descendants = (new_child, *new_child.descendants)
+            for new_child_or_descendant in new_child_and_descendants:  # +DA
+                new_child_or_descendant.ancestors += self_and_ancestors
+            for self_or_ancestor in self_and_ancestors:  # +AD
+                self_or_ancestor.descendants += new_child_and_descendants
+
+    def shake_out(self):
+        self_and_descendants = (self, *self.descendants)
+        for ancestor in self.ancestors:
+            for self_or_descendant in self_and_descendants:  # −AD
+                ancestor.descendants.remove(self_or_descendant)
+            for descendant in self.descendants:  # −DA
+                descendant.ancestors.remove(ancestor)
+        self.ancestors = []  # −DA
+        self.parent.children.remove(self)  # −C
+        self.parent = None  # −P
 
 
 class _BodyGraphicsContainer(
@@ -49,23 +68,50 @@ class _BodyGraphicsContainer(
         _ContainerItem.__init__(self, item.id, item.name, item.product_name)
         BodyContainerMixin.__init__(self, 1.0/target_fps)
         GraphicsContainerMixin.__init__(self)
-        self._picked_up = False
+        self.picked_up = False
         self.model: Model
-        self.self_and_desc_with_children: List[_BodyGraphicsContainer] = [self]
+        # self if it has children + descendants with children
+        # needed for a significant increase in performance in the main loop
+        self.and_childrened_descendants: List[_BodyGraphicsContainer] = []
 
-    def stuff_by(self, items):
-        super().stuff_by(items)
-        for ancestor in self.ancestors:
-            ancestor.self_and_desc_with_children.append(self)
-        self._create_subworld()
-        for child in self.children:
-            child.create_body()
-        for item in (self, *self.ancestors):
-            item.adjust_area()
-            item.adjust_total_mass()
-        for child in self.children:
-            child.throw_in()
-            child.create_graphics()
+    def stuff_by(self, new_children, throwing_target=None):
+        if not self.children:
+            for self_or_ancestor in (self, *self.ancestors):
+                self_or_ancestor.and_childrened_descendants.append(self)
+        for self_or_ancestor in (self, *self.ancestors):
+            for new_child in new_children:
+                self_or_ancestor.and_childrened_descendants += \
+                        new_child.and_childrened_descendants
+        if not self.children: self._create_subworld()
+        super().stuff_by(new_children)
+        for new_child in new_children: new_child.create_body()
+        for self_or_ancestor in (self, *self.ancestors):
+            self_or_ancestor.adjust_area()
+            self_or_ancestor.adjust_total_mass()
+        self.throw_in(new_children, throwing_target)
+        for new_child in new_children:
+            if not new_child.q_item: new_child.create_graphics()
+            new_child.set_graphics_parent()
+            new_child.q_item_move()
+
+    def shake_out(self):
+        parent = self.parent
+        ancestors = self.ancestors[:]
+        super().shake_out()
+        for ancestor in ancestors:
+            for self_or_childrened_descendant \
+                    in self.and_childrened_descendants:
+                ancestor.and_childrened_descendants.remove(
+                    self_or_childrened_descendant
+                    )
+        if not parent.children:
+            for ancestor in ancestors:
+                ancestor.and_childrened_descendants.remove(parent)
+        for ancestor in ancestors:
+            ancestor.adjust_area()
+            ancestor.adjust_total_mass()
+            for b2body in ancestor.b2subworld.bodies:
+                b2body.awake = True
 
     def adjust_area(self):
         ''' calculate area with all children and adjust parent area '''
@@ -76,7 +122,7 @@ class _BodyGraphicsContainer(
             if children_len == 1:
                 area += children_area
             else:
-                radii = sorted([child.radius for child in self.children])
+                radii = sorted(child.radius for child in self.children)
                 area1 = area + children_area
                 area2 = packing_specific_area(radii) * children_area
                 top2radii = sum(radii[-2:])
@@ -94,6 +140,10 @@ class _BodyGraphicsContainer(
         self.total_mass = total_mass
 
     def pinch(self):
+        self.q_item.setToolTip(
+            f'{self.name}\nS = {self.area}\nm = {self.total_mass}\n'
+            f'ρ·S = {self.density*self.area}'
+            )
         self.model.hovered_item = self
         self._pinch_body()
         self.q_item.paint_pinched()
@@ -101,7 +151,10 @@ class _BodyGraphicsContainer(
     def release(self):
         self.model.hovered_item = None
         self._release_body()
-        self.q_item.paint_released()
+        if self.picked_up:
+            self.q_item.paint_picked_up()
+        else:
+            self.q_item.paint_initial()
 
     def start_dragging(self, drag_point):
         self.drag_point = drag_point
@@ -113,16 +166,33 @@ class _BodyGraphicsContainer(
 
     def finish_dragging(self):
         self.drag_target = None
-        self.b2body.bullet = False
+        def set_bullet_to_false(): self.b2body.bullet = False
+        QTimer.singleShot(3000, set_bullet_to_false)
         self.pinch()
 
     def toggle_picked_up(self):
-        if self._picked_up:
-            self.q_item.paint_dropped()
-        else:
+        self.picked_up = not self.picked_up
+        if self.picked_up:
+            self.model.picked_up_items.append(self)
             self._release_body()
             self.q_item.paint_picked_up()
-        self._picked_up = not self._picked_up
+            for descendant in self.descendants:
+                if descendant.picked_up:
+                    descendant.picked_up = False
+                    self.model.picked_up_items.remove(descendant)
+                descendant.q_item.paint_picked_up_descendant()
+        else:
+            self.model.picked_up_items.remove(self)
+            for item in (self, *self.descendants):
+                item.q_item.paint_initial()
+
+    def take_picked_up(self, throwing_target):
+        picked_up_items = self.model.picked_up_items
+        for picked_up in picked_up_items:
+            picked_up.shake_out()
+        self.stuff_by(picked_up_items, throwing_target)
+        for picked_up in picked_up_items[:]:
+            picked_up.toggle_picked_up()
 
 
 class _UpdatableHierarchyMixin(QThread):
@@ -158,8 +228,10 @@ class _UpdatableHierarchyMixin(QThread):
                 else:
                     b2subworld_step()
             else:
+                b2subworlds_step()  # 25–13% CPU
             '''
             b2subworlds_step()  # 25–13% CPU
+            if self.b2bodies_to_destroy: self._destroy_b2bodies_to_destroy()
             updated_emit()  # 17–5% CPU
             tick(self.target_fps)
 
@@ -187,6 +259,7 @@ class Model(
         _UpdatableHierarchyMixin.__init__(self, target_fps)
         self._storage: Storage = storage
         self.hovered_item: _BodyGraphicsContainer = None
+        self.picked_up_items: List[_BodyGraphicsContainer] = []
 
     @property
     def target_fps(self):
@@ -208,4 +281,4 @@ class Model(
         for child in children: child.model = self
         container.stuff_by(children)
         QApplication.processEvents()
-        for child in container.children: self.stuff(child)
+        for child in children: self.stuff(child)

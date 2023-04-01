@@ -29,22 +29,27 @@ class _InteractiveGraphicsCircle(_GraphicsCircle, Ui_InteractiveGraphics):
     def mapToBox2D(self, pos):
         return [x/self.graphics_ratio for x in (pos.x(), pos.y())]
 
-    def hoverEnterEvent(self, event):
-        self._item.pinch()
-
-    def hoverLeaveEvent(self, event):
-        self._item.release()
+    def hoverEnterEvent(self, event): self._item.pinch()
+    def hoverLeaveEvent(self, event): self._item.release()
 
     def mousePressEvent(self, event):
         button = event.button()
         if button == Qt.LeftButton:
-            self._item.start_dragging(self.mapToBox2D(event.pos()))
+            picked_up_items = self._item.model.picked_up_items
+            if picked_up_items:
+                if self._item in picked_up_items: return
+                throwing_target = self.mapToBox2D(event.pos())
+                self._item.take_picked_up(throwing_target)
+            else:
+                drag_point = self.mapToBox2D(event.pos())
+                self._item.start_dragging(drag_point)
         elif button == Qt.RightButton:
             self._item.toggle_picked_up()
 
     def mouseMoveEvent(self, event):
         if event.buttons() != Qt.LeftButton: return
-        self._item.drag(self.mapToBox2D(self.mapToParent(event.pos())))
+        drag_target = self.mapToBox2D(self.mapToParent(event.pos()))
+        self._item.drag(drag_target)
 
     def mouseReleaseEvent(self, event):
         if event.button() != Qt.LeftButton: return
@@ -54,16 +59,16 @@ class _InteractiveGraphicsCircle(_GraphicsCircle, Ui_InteractiveGraphics):
 class GraphicsContainerMixin:
 
     def __init__(self):
-        self.q_item: _InteractiveGraphicsCircle
+        self.q_item: _InteractiveGraphicsCircle = None
 
     def create_graphics(self):
-        q_item = _InteractiveGraphicsCircle(self)
+        self.q_item = _InteractiveGraphicsCircle(self)
+
+    def set_graphics_parent(self):
         if self.parent.is_root:
-            self.parent.q_scene.addItem(q_item)
+            self.parent.q_scene.addItem(self.q_item)
         else:
-            q_item.setParentItem(self.parent.q_item)
-        self.q_item = q_item
-        self.q_item_move()
+            self.q_item.setParentItem(self.parent.q_item)
 
     def q_item_move(self): self.q_item.setPos(*self.position)
 

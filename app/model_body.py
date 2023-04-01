@@ -1,4 +1,4 @@
-from math import pi, sqrt, sin, cos
+from math import pi, sqrt, sin, cos, acos, hypot, atan2
 from random import random
 
 from Box2D import b2World, b2Body, b2_staticBody, b2_dynamicBody
@@ -12,7 +12,7 @@ _ZERO_VECTOR = (0.0, 0.0)
 class _BodyBase:
 
     def __init__(self):
-        self.b2body: b2Body
+        self.b2body: b2Body = None
 
     @property
     def position(self): return self.b2body.position
@@ -25,8 +25,7 @@ class _BodyBase:
     def _shape(self): return self._fixture.shape
 
     @property
-    def radius(self):
-        return self._shape.radius
+    def radius(self): return self._shape.radius
 
     @radius.setter
     def radius(self, radius):
@@ -35,22 +34,19 @@ class _BodyBase:
         self.density = mass / self.area
 
     @property
-    def area(self):
-        r = self.radius
-        return pi * r*r
-
+    def area(self): r = self.radius; return pi * r*r
     @area.setter
-    def area(self, area):
-        self.radius = sqrt(area/pi)
+    def area(self, area): self.radius = sqrt(area/pi)
 
     @property
-    def mass(self): return self.b2body.mass
+    def mass(self): return self.b2body.mass or self.density*self.area
+    # density-area option is needed when the body is static (pinched)
+
     @mass.setter
     def mass(self, mass): self.density = mass / self.area
 
     @property
-    def density(self):
-        return self._fixture.density
+    def density(self): return self._fixture.density
 
     @density.setter
     def density(self, density):
@@ -90,8 +86,8 @@ class _InteractiveBodyMixin:
 class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
 
     def __init__(self, time_step):
-        super().__init__()
         _InteractiveBodyMixin.__init__(self)
+        _BodyBase.__init__(self)
         self.time_step = time_step
         self.b2subworld: b2World
 
@@ -103,10 +99,17 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
     def _create_subworld(self):
         self.b2subworld = b2World(gravity=(0.0,0.0))
 
+    def destroy_body(self):
+        self.parent.b2subworld.DestroyBody(self.b2body)
+        self.b2body = None
+
     def create_body(self):
+        if self.b2body:
+            mass, area = self.total_mass, self.area
+            self.model.b2bodies_to_destroy.append(self.b2body)
+        else:
+            mass, area = self.self_mass, self.self_volume
         b2body = self.parent.b2subworld.CreateDynamicBody()
-        mass = self.self_mass
-        area = self.self_volume
         b2body.CreateCircleFixture(
             radius = sqrt(area/pi),
             friction = 1.0,
@@ -118,18 +121,27 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
         b2body.userData = self
         self.b2body = b2body
 
-    def throw_in(self):
-        distance = self.parent.radius + self.radius
-        azimuth = 2*pi * random()
+    def throw_in(self, children, target=None):
+        target = target or _ZERO_VECTOR
+        target_radius = hypot(*target)
+        if target_radius:
+            beam_width = 2*acos(target_radius/self.radius)
+            beam_width = beam_width**3/(pi*pi)
+        else:
+            beam_width = pi
+        ratio = beam_width / sum(child.radius for child in children)
+        current_angle = atan2(*reversed(target)) - beam_width
         cos_sin = (cos, sin)
-        start_position = [distance*f(azimuth) for f in cos_sin]
-        throw_in_angle = pi/2 * (random() - 0.5)
-        velocity = [
-            -2.0 * xy * f(throw_in_angle)
-                for xy, f in zip(start_position, cos_sin)
-            ]
-        self.position = start_position
-        self.b2body.linearVelocity = velocity
+        for child in children:
+            distance = self.radius + child.radius
+            angular_radius = child.radius * ratio
+            azimuth = current_angle + angular_radius
+            current_angle += 2*angular_radius
+            start = [distance*f(azimuth) for f in cos_sin]
+            factor = 5*random()
+            velocity = [factor*(t - s) for t, s in zip(target, start)]
+            child.position = start
+            child.b2body.linearVelocity = velocity
 
     def rake_in(self, outersected_):
         radius = self.radius
@@ -156,7 +168,7 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
             child.b2subworlds_step()
         self.b2subworld_step()
         '''
-        for item in self.self_and_desc_with_children:
+        for item in self.and_childrened_descendants:
             item.b2subworld_step()
 
     def b2superworld_step(self): self.parent.b2subworld_step()
@@ -171,12 +183,16 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
 
 
 class BodyHierarchyMixin:
-
+    '''
+    _radius, _total_mass, position, radius, total_mass are dummies
+    for root instances (without b2body)
+    '''
     def __init__(self):
         self._radius: float
         self._total_mass: float
         self.area = self.self_volume
         self.total_mass = self.self_mass
+        self.b2bodies_to_destroy = []
 
     def _set_time_step(self, time_step):
         for descendant in self.descendants:
@@ -194,3 +210,8 @@ class BodyHierarchyMixin:
     def total_mass(self): return self._total_mass
     @total_mass.setter
     def total_mass(self, mass): self._total_mass = mass
+
+    def _destroy_b2bodies_to_destroy(self):
+        for b2body in self.b2bodies_to_destroy:
+            b2body.world.DestroyBody(b2body)
+        self.b2bodies_to_destroy = []
