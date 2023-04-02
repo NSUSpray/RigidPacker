@@ -20,7 +20,13 @@ class _PhysicalItemDataMixin:
 
 @dataclass
 class ItemData(_PhysicalItemDataMixin, _ItemDataBase):
+
     ''' Represents data transfer objects (DTO). Contains only database data '''
+
+    def __hash__(self): return self.id
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.id == other.id
 
 
 class Storage:

@@ -61,6 +61,21 @@ class _InteractiveGraphicsCircle(_GraphicsCircle, Ui_InteractiveGraphics):
             throwing_target = self.mapToBox2D(event.pos())
             item.take_picked_up(throwing_target)
 
+    def mouseDoubleClickEvent(self, event):
+        if event.button() != Qt.RightButton: return
+        item = self._item
+        picked_up_descendants = \
+                set(item.descendants) & set(item.model.picked_up_items)
+        if picked_up_descendants:
+            # unpick picked up descendants
+            for picked_up_descendant in picked_up_descendants:
+                picked_up_descendant.toggle_picked_up()
+        else:
+            # pick up or give up all siblings
+            for sibling in item.parent.children:
+                if sibling.picked_up == item.picked_up: continue
+                sibling.toggle_picked_up()
+
 
 class GraphicsContainerMixin:
 
