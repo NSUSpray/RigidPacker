@@ -25,6 +25,7 @@ class _InteractiveGraphicsCircle(_GraphicsCircle, Ui_InteractiveGraphics):
     def __init__(self, item):
         super().__init__(item)
         Ui_InteractiveGraphics.__init__(self)
+        self._being_moved = False
 
     def mapToBox2D(self, pos):
         return [x/self.graphics_ratio for x in (pos.x(), pos.y())]
@@ -36,14 +37,8 @@ class _InteractiveGraphicsCircle(_GraphicsCircle, Ui_InteractiveGraphics):
         button = event.button()
         item = self._item
         if button == Qt.LeftButton:
-            picked_up_items = self._item.model.picked_up_items
-            if picked_up_items:
-                if self._item in picked_up_items: return
-                throwing_target = self.mapToBox2D(event.pos())
-                self._item.take_picked_up(throwing_target)
-            else:
-                drag_point = self.mapToBox2D(event.pos())
-                self._item.start_dragging(drag_point)
+            drag_point = self.mapToBox2D(event.pos())
+            item.start_dragging(drag_point)
         elif button == Qt.RightButton:
             for picked_up_item in item.model.picked_up_items:
                 if item in picked_up_item.ancestors: return
@@ -51,12 +46,20 @@ class _InteractiveGraphicsCircle(_GraphicsCircle, Ui_InteractiveGraphics):
 
     def mouseMoveEvent(self, event):
         if event.buttons() != Qt.LeftButton: return
+        self._being_moved = True
         drag_target = self.mapToBox2D(self.mapToParent(event.pos()))
         self._item.drag(drag_target)
 
     def mouseReleaseEvent(self, event):
         if event.button() != Qt.LeftButton: return
-        self._item.finish_dragging()
+        item = self._item
+        if self._being_moved:
+            item.finish_dragging()
+            self._being_moved = False
+        elif item.model.picked_up_items:  # just a mouse click, not a drag
+            if item.picked_up: return
+            throwing_target = self.mapToBox2D(event.pos())
+            item.take_picked_up(throwing_target)
 
 
 class GraphicsContainerMixin:
