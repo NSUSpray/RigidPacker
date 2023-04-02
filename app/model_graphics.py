@@ -1,16 +1,15 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QGraphicsEllipseItem, QGraphicsScene
 
-from graphics import Ui_GraphicsItem, Ui_InteractiveGraphics
+from graphics import Ui_InteractiveGraphics
 
 
-class _GraphicsCircle(QGraphicsEllipseItem, Ui_GraphicsItem):
+class _GraphicsCircle(QGraphicsEllipseItem):
 
     def __init__(self, item):
         self._item = item
         r = item.radius * self.graphics_ratio
         super().__init__(-r, -r, 2.0*r, 2.0*r)  # left top width height
-        Ui_GraphicsItem.__init__(self)
 
     def setRadius(self, r):
         r *= self.graphics_ratio
@@ -20,11 +19,10 @@ class _GraphicsCircle(QGraphicsEllipseItem, Ui_GraphicsItem):
         super().setPos(x*self.graphics_ratio, y*self.graphics_ratio)
 
 
-class _InteractiveGraphicsCircle(_GraphicsCircle, Ui_InteractiveGraphics):
+class _InteractiveGraphicsMixin(Ui_InteractiveGraphics):
 
-    def __init__(self, item):
-        super().__init__(item)
-        Ui_InteractiveGraphics.__init__(self)
+    def __init__(self):
+        super().__init__()
         self._being_moved = False
 
     def mapToBox2D(self, pos):
@@ -75,6 +73,13 @@ class _InteractiveGraphicsCircle(_GraphicsCircle, Ui_InteractiveGraphics):
             for sibling in item.parent.children:
                 if sibling.picked_up == item.picked_up: continue
                 sibling.toggle_picked_up()
+
+
+class _InteractiveGraphicsCircle(_InteractiveGraphicsMixin, _GraphicsCircle):
+
+    def __init__(self, item):
+        _GraphicsCircle.__init__(self, item)
+        _InteractiveGraphicsMixin.__init__(self)
 
 
 class GraphicsContainerMixin:
