@@ -3,7 +3,7 @@ from random import random
 
 from Box2D import b2World, b2Body, b2_staticBody, b2_dynamicBody
 
-from geometry import outersected
+from utilities.geometry import outersected
 
 
 _ZERO_VECTOR = (0.0, 0.0)

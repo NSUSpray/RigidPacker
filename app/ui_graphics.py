@@ -1,6 +1,7 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
-from wavelength_to_rgb import rgb
+
+from utilities.wavelength_to_rgb import rgb
 
 
 class Ui_GraphicsItem:

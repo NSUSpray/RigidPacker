@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow
 
 from storage import Storage
 from model import Model
-from view import Ui_MainWindow
+from ui_view import Ui_MainWindow
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):

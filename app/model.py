@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QApplication
 from storage import ItemData, Storage
 from model_body import BodyContainerMixin, BodyHierarchyMixin
 from model_graphics import GraphicsContainerMixin, GraphicsHierarchyMixin
-from geometry import packing_specific_area
+from utilities.geometry import packing_specific_area
 
 
 class _ContainerItem(ItemData):
