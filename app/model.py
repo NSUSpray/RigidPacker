@@ -177,9 +177,6 @@ class _BodyGraphicsContainer(
             self._release_body()
             self.q_item.paint_picked_up()
             for descendant in self.descendants:
-                if descendant.picked_up:
-                    descendant.picked_up = False
-                    self.model.picked_up_items.remove(descendant)
                 descendant.q_item.paint_picked_up_descendant()
         else:
             self.model.picked_up_items.remove(self)

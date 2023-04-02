@@ -124,11 +124,14 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
     def throw_in(self, children, target=None):
         target = target or _ZERO_VECTOR
         target_radius = hypot(*target)
-        if target_radius:
+        '''
+        if target_radius and self.radius and target_radius <= self.radius:
             beam_width = 2*acos(target_radius/self.radius)
             beam_width = beam_width**3/(pi*pi)
         else:
             beam_width = pi
+        '''
+        beam_width = (1 - target_radius/self.radius)**2 * pi
         ratio = beam_width / sum(child.radius for child in children)
         current_angle = atan2(*reversed(target)) - beam_width
         cos_sin = (cos, sin)
@@ -160,6 +163,7 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
             if outersected_: child.rake_in(outersected_)
             if child.drag_target: child.drag_body()
         self.b2subworld.Step(self.time_step, 10, 10)
+        self.b2subworld.ClearForces()
 
     def b2subworlds_step(self):
         '''

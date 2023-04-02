@@ -8,7 +8,7 @@ class _ItemDataBase:
     id: int
     name: str
     product_name: str = ''
-    is_root: bool = field(init=False, repr=True)
+    is_root: bool = field(init=False)
     def __post_init__(self): self.is_root = (self.id==Storage.root_id)
 
 

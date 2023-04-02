@@ -34,6 +34,7 @@ class _InteractiveGraphicsCircle(_GraphicsCircle, Ui_InteractiveGraphics):
 
     def mousePressEvent(self, event):
         button = event.button()
+        item = self._item
         if button == Qt.LeftButton:
             picked_up_items = self._item.model.picked_up_items
             if picked_up_items:
@@ -44,7 +45,9 @@ class _InteractiveGraphicsCircle(_GraphicsCircle, Ui_InteractiveGraphics):
                 drag_point = self.mapToBox2D(event.pos())
                 self._item.start_dragging(drag_point)
         elif button == Qt.RightButton:
-            self._item.toggle_picked_up()
+            for picked_up_item in item.model.picked_up_items:
+                if item in picked_up_item.ancestors: return
+            item.toggle_picked_up()
 
     def mouseMoveEvent(self, event):
         if event.buttons() != Qt.LeftButton: return

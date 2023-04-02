@@ -41,9 +41,9 @@ class Ui_GraphicsItem:
 
 class Ui_InteractiveGraphics(Ui_GraphicsItem):
 
-    pinched_pen = Qt.darkGray
-    picked_pen = Qt.darkGray
-    picked_brush = Qt.gray
+    pinched_pen = QColor.fromRgbF(0, 0, 0, 0.25)
+    picked_pen = QColor.fromRgbF(0, 0, 0, 0.125)
+    picked_brush = Qt.transparent
 
     def paint_initial(self):
         super().paint_initial()
