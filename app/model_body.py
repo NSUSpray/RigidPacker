@@ -89,7 +89,7 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
         _InteractiveBodyMixin.__init__(self)
         _BodyBase.__init__(self)
         self.time_step = time_step
-        self.b2subworld: b2World
+        self.b2subworld: b2World = None
 
     @property
     def total_mass(self): return self.mass

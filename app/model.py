@@ -82,7 +82,7 @@ class _BodyGraphicsContainer(
             for new_child in new_children:
                 self_or_ancestor.and_childrened_descendants += \
                         new_child.and_childrened_descendants
-        if not self.children: self._create_subworld()
+        if not self.b2subworld: self._create_subworld()
         super().stuff_by(new_children)
         for new_child in new_children: new_child.create_body()
         for self_or_ancestor in (self, *self.ancestors):
