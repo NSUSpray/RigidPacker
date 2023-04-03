@@ -49,27 +49,42 @@ class Storage:
 
     @property
     def arrangement(self):
-        self._cursor.execute('''
+        request = '''
             SELECT name FROM arrangement WHERE arrangement_id IS ?
-            ''', (self._arrangement_id,))
+            '''
+        data = (self._arrangement_id,)
+        self._cursor.execute(request, data)
         response = self._cursor.fetchone()
         if response: return response[0]
 
     @arrangement.setter
     def arrangement(self, name):
-        self._cursor.execute('''
+        request = '''
             SELECT arrangement_id FROM arrangement WHERE name IS ?
-            ''', (name,))
+            '''
+        data = (name,)
+        self._cursor.execute(request, data)
         response = self._cursor.fetchone()
-        if not response: raise sqlite3.ProgrammingError
+        if not response: raise ValueError
         self._arrangement_id = response[0]
 
     def children_of(self, item):
-        self._cursor.execute('''
-            SELECT item_id, name, product_name FROM placement
-            LEFT JOIN item USING(item_id)
-            WHERE parent_id IS ?
-            AND arrangement_id IS ?
-        ''', (item.id or None, self._arrangement_id))
+        request = '''
+            SELECT item_id, name, product_name
+            FROM placement LEFT JOIN item USING(item_id)
+            WHERE parent_id IS ? AND arrangement_id IS ?
+            '''
+        data = (item.id or None, self._arrangement_id)
+        self._cursor.execute(request, data)
         response = self._cursor.fetchall()
         return [ItemData(*fields) for fields in response]
+
+    def shift(self, items, parent):
+        request = '''
+            UPDATE placement SET parent_id = ?
+            WHERE item_id IN (%s) AND arrangement_id IS ?
+            ''' % ','.join('?' * len(items))
+        item_ids = [item.id for item in items]
+        data = (parent.id or None, *item_ids, self._arrangement_id)
+        self._cursor.execute(request, data)
+        self._connect.commit()

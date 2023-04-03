@@ -186,6 +186,7 @@ class _BodyGraphicsContainer(
         for picked_up in picked_up_items:
             picked_up.shake_out()
         self.stuff_by(picked_up_items, throwing_target)
+        self.model.storage.shift(picked_up_items, self)
         for picked_up in picked_up_items[:]:
             picked_up.toggle_picked_up()
 
@@ -252,7 +253,7 @@ class Model(
         BodyHierarchyMixin.__init__(self)
         GraphicsHierarchyMixin.__init__(self)
         _UpdatableHierarchyMixin.__init__(self, target_fps)
-        self._storage: Storage = storage
+        self.storage: Storage = storage
         self.hovered_item: _BodyGraphicsContainer = None
         self.picked_up_items: List[_BodyGraphicsContainer] = []
 
@@ -269,7 +270,7 @@ class Model(
         ''' create and place all container’s descendants '''
         container = container or self
         container.model = self
-        protos = self._storage.children_of(container)
+        protos = self.storage.children_of(container)
         if not protos: return
         children = [
             _BodyGraphicsContainer(proto, self._target_fps) for proto in protos
