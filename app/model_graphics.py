@@ -4,18 +4,20 @@ from controller import InteractiveGraphicsMixin, InteractiveSceneMixin
 from ui_graphics import Ui_GraphicsItem, Ui_InteractiveGraphics, Ui_Scene
 
 
-class _CircleBase(QGraphicsEllipseItem, Ui_GraphicsItem):
+class _Circle(
+        InteractiveGraphicsMixin,
+        QGraphicsEllipseItem,
+        Ui_GraphicsItem,
+        Ui_InteractiveGraphics,
+        ):
 
     def __init__(self, item, parent=None):
         self._item = item
-        super().__init__(parent)
+        QGraphicsEllipseItem.__init__(self, parent)
         Ui_GraphicsItem.__init__(self)
         if parent: self.adoptScale()
-
-    def adoptScale(self):
-        self._scale = self.scene().scale
-        self.setRadius(self._item.radius)
-        self.setPos(*self._item.position)
+        InteractiveGraphicsMixin.__init__(self)
+        Ui_InteractiveGraphics.__init__(self)
 
     def setRadius(self, r):
         r *= self._scale
@@ -24,36 +26,27 @@ class _CircleBase(QGraphicsEllipseItem, Ui_GraphicsItem):
     def setPos(self, x, y):
         super().setPos(x*self._scale, y*self._scale)
 
+    def adoptScale(self):
+        self._scale = self.scene().scale
+        self.setRadius(self._item.radius)
+        self.setPos(*self._item.position)
 
-class _Circle(InteractiveGraphicsMixin, _CircleBase, Ui_InteractiveGraphics):
-
-    def __init__(self, item, parent=None):
-        _CircleBase.__init__(self, item, parent)
-        InteractiveGraphicsMixin.__init__(self)
-        Ui_InteractiveGraphics.__init__(self)
-
-    def paint_initial(self):
-        _CircleBase.paint_initial(self)
-        Ui_InteractiveGraphics.paint_initial(self)
+    def paintInitial(self):
+        Ui_GraphicsItem.paintInitial(self)
+        Ui_InteractiveGraphics.paintInitial(self)
 
 
-class _SceneBase(QGraphicsScene, Ui_Scene):
+class _Scene(InteractiveSceneMixin, QGraphicsScene, Ui_Scene):
 
     def __init__(self, model):
-        super().__init__()
+        QGraphicsScene.__init__(self)
         Ui_Scene.__init__(self)
         self._model = model
+        InteractiveSceneMixin.__init__(self)
 
     def addItem(self, item):
         super().addItem(item)
         item.adoptScale()
-
-
-class _Scene(InteractiveSceneMixin, _SceneBase):
-
-    def __init__(self, model):
-        _SceneBase.__init__(self, model)
-        InteractiveSceneMixin.__init__(self)
 
 
 class GraphicsContainerMixin:
@@ -72,13 +65,13 @@ class GraphicsContainerMixin:
         parent_q_item = None if self.parent.is_root else self.parent.q_item
         self.q_item.setParentItem(parent_q_item)
 
-    def q_item_move(self): self.q_item.setPos(*self.position)
+    def move_q_item(self): self.q_item.setPos(*self.position)
 
     '''
-    def q_items_move(self):
+    def move_q_items(self):
         for child in self.children:
-            child.q_items_move()
-            child.q_item_move()
+            child.move_q_items()
+            child.move_q_item()
     '''
 
 
@@ -87,5 +80,5 @@ class GraphicsHierarchyMixin:
     def __init__(self):
         self.q_scene = _Scene(self)
 
-    def q_items_move(self):
-        for descendant in self.descendants: descendant.q_item_move()
+    def move_q_items(self):
+        for descendant in self.descendants: descendant.move_q_item()

@@ -94,7 +94,7 @@ class _BodyGraphicsContainer(
                 new_child.adopt_parent_q_item()
             else:
                 new_child.create_q_item()
-            new_child.q_item_move()
+            new_child.move_q_item()
 
     def shake_out(self):
         parent = self.parent
@@ -142,21 +142,17 @@ class _BodyGraphicsContainer(
         self.total_mass = total_mass
 
     def pinch(self):
-        self.q_item.setToolTip(
-            f'{self.name}\nS = {self.area}\nm = {self.total_mass}\n'
-            f'ρ·S = {self.density*self.area}'
-            )
         self.model.hovered_item = self
         self._pinch_b2body()
-        self.q_item.paint_pinched()
+        self.q_item.paintPinched()
 
     def release(self):
         self.model.hovered_item = None
         self._release_b2body()
         if self.picked_up:
-            self.q_item.paint_picked_up()
+            self.q_item.paintPickedUp()
         else:
-            self.q_item.paint_initial()
+            self.q_item.paintInitial()
 
     def start_dragging(self, drag_point):
         self.drag_point = drag_point
@@ -177,13 +173,13 @@ class _BodyGraphicsContainer(
         if self.picked_up:
             self.model.picked_up_items.append(self)
             self._release_b2body()
-            self.q_item.paint_picked_up()
+            self.q_item.paintPickedUp()
             for descendant in self.descendants:
-                descendant.q_item.paint_picked_up_descendant()
+                descendant.q_item.paintPickedUpDescendant()
         else:
             self.model.picked_up_items.remove(self)
             for item in (self, *self.descendants):
-                item.q_item.paint_initial()
+                item.q_item.paintInitial()
 
     def take_picked_up(self, throwing_target):
         picked_up_items = self.model.picked_up_items
@@ -204,7 +200,7 @@ class _UpdatableHierarchyMixin(QThread):
         self._running: bool
         self._target_fps = target_fps
         self.gentle = False
-        self.updated.connect(self.q_items_move)
+        self.updated.connect(self.move_q_items)
 
     def __del__(self): pygame.quit()
 

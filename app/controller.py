@@ -1,4 +1,4 @@
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 
 
 class InteractiveGraphicsMixin:
@@ -6,8 +6,12 @@ class InteractiveGraphicsMixin:
     def __init__(self):
         self._being_moved = False
 
-    def hoverEnterEvent(self, event): self._item.pinch()
-    def hoverLeaveEvent(self, event): self._item.release()
+    def hoverEnterEvent(self, event):
+        self._item.pinch()
+        self.scene().hovered.emit(self._item)
+
+    def hoverLeaveEvent(self, event):
+        self._item.release()
 
     def mousePressEvent(self, event):
         event.accept()
@@ -59,8 +63,15 @@ class InteractiveGraphicsMixin:
 
 class InteractiveSceneMixin:
 
+    hovered = pyqtSignal(object)
+
     def mapToBox2D(self, pos):
         return [x/self.scale for x in (pos.x(), pos.y())]
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        if event.isAccepted(): return
+        self.hovered.emit(self._model)
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)

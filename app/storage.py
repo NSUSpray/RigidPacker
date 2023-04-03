@@ -4,24 +4,23 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class _ItemDataBase:
+class _PhysicalItemDataMixin:
+    self_mass: float = field(default=1.0, init=False)
+    self_volume: float = field(default=4/3*pi*(0.1)**3, init=False)
+
+
+@dataclass
+class ItemData(_PhysicalItemDataMixin):
+
+    ''' Represents data transfer objects (DTO). Contains only database data '''
+
     id: int
     name: str
     product_name: str = ''
     is_root: bool = field(init=False)
-    def __post_init__(self): self.is_root = (self.id==Storage.root_id)
 
-
-@dataclass
-class _PhysicalItemDataMixin:
-    self_mass: float = 1.0
-    self_volume: float = 4/3*pi * (0.1)**3
-
-
-@dataclass
-class ItemData(_PhysicalItemDataMixin, _ItemDataBase):
-
-    ''' Represents data transfer objects (DTO). Contains only database data '''
+    def __post_init__(self):
+        self.is_root = (self.id==Storage.root_id)
 
     def __hash__(self): return self.id
 

@@ -14,6 +14,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         Ui_MainWindow.__init__(self)
         self._model: Model = model
         self._graphics_view.setScene(model.q_scene)
+        model.q_scene.hovered.connect(self._update_status_bar)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
