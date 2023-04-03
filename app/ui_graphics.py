@@ -6,7 +6,6 @@ from utilities.wavelength_to_rgb import rgb
 
 class Ui_GraphicsItem:
 
-    graphics_ratio = 230.0
     initial_pen = Qt.transparent
 
     def __init__(self):
@@ -40,14 +39,13 @@ class Ui_GraphicsItem:
         self.setFlag(self.ItemContainsChildrenInShape)
 
 
-class Ui_InteractiveGraphics(Ui_GraphicsItem):
+class Ui_InteractiveGraphics:
 
     pinched_pen = QColor.fromRgbF(0, 0, 0, 0.25)
     picked_pen = QColor.fromRgbF(0, 0, 0, 0.125)
     picked_brush = Qt.transparent
 
     def paint_initial(self):
-        super().paint_initial()
         # for child in item.children:
         #     child.q_item.setFlag(self.ItemClipsToShape, enabled=False)
         self.setZValue(0)
@@ -73,3 +71,7 @@ class Ui_InteractiveGraphics(Ui_GraphicsItem):
         self.setBrush(self.picked_brush)
         self.setAcceptedMouseButtons(Qt.NoButton)
         self.setAcceptHoverEvents(False)
+
+
+class Ui_Scene:
+    scale = 230.0  # pixels per meter

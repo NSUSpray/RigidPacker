@@ -61,18 +61,18 @@ class _InteractiveBodyMixin:
         self.drag_point = _ZERO_VECTOR
         self.drag_target = None
 
-    def _pinch_body(self):
+    def _pinch_b2body(self):
         self._last_velocity = self.b2body.linearVelocity.copy()
         self.b2body.type = b2_staticBody
 
-    def _release_body(self):
+    def _release_b2body(self):
         self.b2body.type = b2_dynamicBody
         self.b2body.linearVelocity = self._last_velocity
 
-    def _release_body_calmly(self):
+    def _release_b2body_calmly(self):
         self.b2body.type = b2_dynamicBody
 
-    def drag_body(self):
+    def drag_b2body(self):
         factor = -10.0 / self.total_mass  # real inertia
         # factor = -10.0 / sqrt(self.total_mass)  # compromise
         # factor = -10.0  # best dynamism
@@ -99,11 +99,11 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
     def _create_subworld(self):
         self.b2subworld = b2World(gravity=(0.0,0.0))
 
-    def destroy_body(self):
+    def destroy_b2body(self):
         self.parent.b2subworld.DestroyBody(self.b2body)
         self.b2body = None
 
-    def create_body(self):
+    def create_b2body(self):
         if self.b2body:
             mass, area = self.total_mass, self.area
             self.model.b2bodies_to_destroy.append(self.b2body)
@@ -161,7 +161,7 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
                 child.radius, parent_radius, child.position.length
                 )
             if outersected_: child.rake_in(outersected_)
-            if child.drag_target: child.drag_body()
+            if child.drag_target: child.drag_b2body()
         self.b2subworld.Step(self.time_step, 10, 10)
         self.b2subworld.ClearForces()
 

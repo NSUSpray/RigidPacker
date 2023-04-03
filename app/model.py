@@ -84,14 +84,16 @@ class _BodyGraphicsContainer(
                         new_child.and_childrened_descendants
         if not self.b2subworld: self._create_subworld()
         super().stuff_by(new_children)
-        for new_child in new_children: new_child.create_body()
+        for new_child in new_children: new_child.create_b2body()
         for self_or_ancestor in (self, *self.ancestors):
             self_or_ancestor.adjust_area()
             self_or_ancestor.adjust_total_mass()
         self.throw_in(new_children, throwing_target)
         for new_child in new_children:
-            if not new_child.q_item: new_child.create_graphics()
-            new_child.set_graphics_parent()
+            if new_child.q_item:
+                new_child.adopt_parent_q_item()
+            else:
+                new_child.create_q_item()
             new_child.q_item_move()
 
     def shake_out(self):
@@ -145,12 +147,12 @@ class _BodyGraphicsContainer(
             f'ρ·S = {self.density*self.area}'
             )
         self.model.hovered_item = self
-        self._pinch_body()
+        self._pinch_b2body()
         self.q_item.paint_pinched()
 
     def release(self):
         self.model.hovered_item = None
-        self._release_body()
+        self._release_b2body()
         if self.picked_up:
             self.q_item.paint_picked_up()
         else:
@@ -162,7 +164,7 @@ class _BodyGraphicsContainer(
 
     def drag(self, drag_target):
         self.drag_target = drag_target
-        self._release_body_calmly()
+        self._release_b2body_calmly()
 
     def finish_dragging(self):
         self.drag_target = None
@@ -174,7 +176,7 @@ class _BodyGraphicsContainer(
         self.picked_up = not self.picked_up
         if self.picked_up:
             self.model.picked_up_items.append(self)
-            self._release_body()
+            self._release_b2body()
             self.q_item.paint_picked_up()
             for descendant in self.descendants:
                 descendant.q_item.paint_picked_up_descendant()
@@ -270,12 +272,12 @@ class Model(
     def stuff(self, container=None):
         ''' create and place all container’s descendants '''
         container = container or self
+        container.model = self
         protos = self._storage.children_of(container)
         if not protos: return
         children = [
             _BodyGraphicsContainer(proto, self._target_fps) for proto in protos
             ]
-        for child in children: child.model = self
         container.stuff_by(children)
         QApplication.processEvents()
         for child in children: self.stuff(child)
