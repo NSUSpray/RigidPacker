@@ -1,4 +1,4 @@
-from math import pi, sqrt, sin, cos, acos, hypot, atan2
+from math import pi, sqrt, sin, cos, hypot, atan2
 from random import random
 
 from Box2D import b2World, b2Body, b2_staticBody, b2_dynamicBody
@@ -97,7 +97,7 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
     def total_mass(self, mass): self.mass = mass
 
     def _create_subworld(self):
-        self.b2subworld = b2World(gravity=(0.0,0.0))
+        self.b2subworld = b2World(gravity=_ZERO_VECTOR)
 
     def destroy_b2body(self):
         self.parent.b2subworld.DestroyBody(self.b2body)

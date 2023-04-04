@@ -33,7 +33,6 @@ class InteractiveGraphicsMixin:
         self._item.drag(drag_target)
 
     def mouseReleaseEvent(self, event):
-        event.accept()
         if event.button() != Qt.LeftButton: return
         item = self._item
         if self._being_moved:
