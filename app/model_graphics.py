@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QGraphicsEllipseItem, QGraphicsScene
 
-from controller import Ctrl_GraphicsItem, Ctrl_GraphicsScene
-from ui_graphics import Ui_GraphicsItem, Ui_InteractiveGraphics, Ui_GraphicsScene
+from _ctrl import Ctrl_GraphicsItem, Ctrl_GraphicsScene
+from _ui import Ui_GraphicsItem, Ui_InteractiveGraphics, Ui_GraphicsScene
 
 
 class _Circle(

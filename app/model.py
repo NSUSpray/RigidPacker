@@ -5,7 +5,7 @@ import pygame
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QApplication
 
-from storage import ItemData, Storage
+from repository import ItemData, Repository
 from model_body import BodyContainerMixin, BodyHierarchyMixin
 from model_graphics import GraphicsContainerMixin, GraphicsHierarchyMixin
 from utilities.geometry import packing_specific_area
@@ -186,7 +186,7 @@ class _BodyGraphicsContainer(
         for picked_up in picked_up_items:
             picked_up.shake_out()
         self.stuff_by(picked_up_items, throwing_target)
-        self.model.storage.shift(picked_up_items, self)
+        self.model.repository.shift(picked_up_items, self)
         for picked_up in picked_up_items[:]:
             picked_up.toggle_picked_up()
 
@@ -248,12 +248,12 @@ class Model(
 
     ''' Has connection to the database and can stuff self recursively '''
 
-    def __init__(self, storage, target_fps):
-        _BodyGraphicsContainer.__init__(self, storage.root, target_fps)
+    def __init__(self, repository, target_fps):
+        _BodyGraphicsContainer.__init__(self, repository.root, target_fps)
         BodyHierarchyMixin.__init__(self)
         GraphicsHierarchyMixin.__init__(self)
         _UpdatableHierarchyMixin.__init__(self, target_fps)
-        self.storage: Storage = storage
+        self.repository: Repository = repository
         self.hovered_item: _BodyGraphicsContainer = None
         self.picked_up_items: List[_BodyGraphicsContainer] = []
 
@@ -270,7 +270,7 @@ class Model(
         ''' create and place all container’s descendants '''
         container = container or self
         container.model = self
-        protos = self.storage.children_of(container)
+        protos = self.repository.children_of(container)
         if not protos: return
         children = [
             _BodyGraphicsContainer(proto, self._target_fps) for proto in protos

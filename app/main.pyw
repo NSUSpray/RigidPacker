@@ -1,10 +1,10 @@
 #! python3.7
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsView
 
-from storage import Storage
+from repository import Repository
 from model import Model
-from controller import Ctrl_MainWindow, Ctrl_GraphicsView
-from ui_graphics import Ui_MainWindow, Ui_GraphicsView
+from _ctrl import Ctrl_MainWindow, Ctrl_GraphicsView
+from _ui import Ui_MainWindow, Ui_GraphicsView
 
 
 class GraphicsView(Ctrl_GraphicsView, QGraphicsView, Ui_GraphicsView):
@@ -29,8 +29,8 @@ class MainWindow(Ctrl_MainWindow, QMainWindow, Ui_MainWindow):
 
 
 app = QApplication([])
-storage = Storage('../sample.db')
-model = Model(storage, target_fps=30.0385)
+repository = Repository('../sample.db')
+model = Model(repository, target_fps=30.0385)
 window = MainWindow(model)
 model.start()
 window.showMaximized()

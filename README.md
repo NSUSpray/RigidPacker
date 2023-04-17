@@ -9,7 +9,7 @@ This script allows you to visualize any hierarchical data (in this case, [SQLite
 
 The circle packing of the treemap chart is implemented in an original way—in real-time using rigid body physics (the [Box2D](https://github.com/pybox2d/pybox2d) engine is used). Natural packing instead of rigorous math makes hierarchy editing even more intuitive.
 
-If desired, you can adapt this script to visualize and edit other hierarchical data structures by implementing a wrapper for them similar to the *storage.Storage* class.
+If desired, you can adapt this script to visualize and edit other hierarchical data structures by implementing a wrapper for them similar to the *repository.Repository* class.
 
 The motive for creating this project is to do manual and automatic control of personal stuff using a database and an interactive chart as a client/editor.
 

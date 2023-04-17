@@ -20,7 +20,7 @@ class ItemData(_PhysicalItemDataMixin):
     is_root: bool = field(init=False)
 
     def __post_init__(self):
-        self.is_root = (self.id==Storage.root_id)
+        self.is_root = (self.id==Repository.root_id)
 
     def __hash__(self): return self.id
 
@@ -28,7 +28,7 @@ class ItemData(_PhysicalItemDataMixin):
         return isinstance(other, self.__class__) and self.id == other.id
 
 
-class Storage:
+class Repository:
 
     ''' Represents data access object (DAO) '''
 
