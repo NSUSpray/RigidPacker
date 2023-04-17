@@ -14,17 +14,17 @@ class Ui_GraphicsItem:
 
     def _make_color(self):
         name = self._item.name
-        c = name[0].lower()
-        if 'a' <= c <= 'z':
-            hue = (ord(c) - ord('a'))/(ord('z') - ord('a') + 1)
-        elif 'а' <= c <= 'я' or c == 'ё':
-            if c == 'ё': c = 'е'
-            hue = (ord(c) - ord('а'))/(ord('я') - ord('а') + 1)
-        elif '0' <= c <= '9':
-            hue = (ord(c) - ord('0'))/(ord('9') - ord('0') + 1)
+        first_letter = name[0].lower()
+        if first_letter == 'ё': first_letter = 'е'
+        for bounds in {('a', 'z'), ('а', 'я'), ('0', '9')}:
+            if bounds[0] <= first_letter <= bounds[1]: break
         else:
-            return Qt.white
-        return QColor.fromRgb(*rgb(645 - hue*265))
+            return Ot.white
+        min_ord, max_ord = [ord(bound) for bound in bounds]
+        hue = (ord(first_letter) - min_ord) / (max_ord - min_ord + 1)
+        min_len, max_len = (265, 645)  # wavelen bounds in nanometers
+        wavelen = max_len - hue*min_len
+        return QColor.fromRgb(*rgb(wavelen))
 
     def paintInitial(self):
         self.setPen(self.initialPen)
