@@ -1,26 +1,31 @@
 #! python3.7
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsView
 
 from storage import Storage
 from model import Model
-from ui_view import Ui_MainWindow
+from controller import Ctrl_MainWindow, Ctrl_GraphicsView
+from ui_graphics import Ui_MainWindow, Ui_GraphicsView
 
 
-class MainWindow(QMainWindow, Ui_MainWindow):
+class GraphicsView(Ctrl_GraphicsView, QGraphicsView, Ui_GraphicsView):
+
+    def __init__(self, *args, **kwargs):
+        QGraphicsView.__init__(self, *args, **kwargs)
+        Ctrl_GraphicsView.__init__(self)
+        Ui_GraphicsView.__init__(self)
+
+
+class MainWindow(Ctrl_MainWindow, QMainWindow, Ui_MainWindow):
 
     def __init__(self, model, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        Ui_MainWindow.__init__(self)
         self._model: Model = model
+        self._graphics_view = GraphicsView()
         self._graphics_view.setScene(model.q_scene)
-        model.q_scene.hovered.connect(self._update_status_bar)
+        QMainWindow.__init__(self, *args, **kwargs)
+        Ctrl_MainWindow.__init__(self)
+        Ui_MainWindow.__init__(self)
+        model.q_scene.hovered.connect(self.updateStatusBar)
 
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
-            self.close()
-        elif event.key() == Qt.Key_Space:
-            self._model.toggle_gentle()
 
 
 app = QApplication([])

@@ -1,11 +1,11 @@
 from PyQt5.QtWidgets import QGraphicsEllipseItem, QGraphicsScene
 
-from controller import InteractiveGraphicsMixin, InteractiveSceneMixin
-from ui_graphics import Ui_GraphicsItem, Ui_InteractiveGraphics, Ui_Scene
+from controller import Ctrl_GraphicsItem, Ctrl_GraphicsScene
+from ui_graphics import Ui_GraphicsItem, Ui_InteractiveGraphics, Ui_GraphicsScene
 
 
 class _Circle(
-        InteractiveGraphicsMixin,
+        Ctrl_GraphicsItem,
         QGraphicsEllipseItem,
         Ui_GraphicsItem,
         Ui_InteractiveGraphics,
@@ -16,7 +16,7 @@ class _Circle(
         QGraphicsEllipseItem.__init__(self, parent)
         Ui_GraphicsItem.__init__(self)
         if parent: self.adoptScale()
-        InteractiveGraphicsMixin.__init__(self)
+        Ctrl_GraphicsItem.__init__(self)
         Ui_InteractiveGraphics.__init__(self)
 
     def setRadius(self, r):
@@ -36,13 +36,13 @@ class _Circle(
         Ui_InteractiveGraphics.paintInitial(self)
 
 
-class _Scene(InteractiveSceneMixin, QGraphicsScene, Ui_Scene):
+class _Scene(Ctrl_GraphicsScene, QGraphicsScene, Ui_GraphicsScene):
 
     def __init__(self, model):
         QGraphicsScene.__init__(self)
-        Ui_Scene.__init__(self)
+        Ui_GraphicsScene.__init__(self)
+        Ctrl_GraphicsScene.__init__(self)
         self._model = model
-        InteractiveSceneMixin.__init__(self)
 
     def addItem(self, item):
         super().addItem(item)

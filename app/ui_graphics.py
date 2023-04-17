@@ -1,5 +1,5 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor
+from PyQt5.QtGui import QColor, QPainter
 
 from utilities.wavelength_to_rgb import rgb
 
@@ -72,5 +72,38 @@ class Ui_InteractiveGraphics:
         self.setAcceptHoverEvents(False)
 
 
-class Ui_Scene:
+class Ui_GraphicsScene:
     scale = 230.0  # pixels per meter
+
+
+class Ui_GraphicsView:
+
+    def __init__(self, *args, **kwargs):
+        self.setBackgroundBrush(Qt.gray)
+        self.setRenderHint(QPainter.Antialiasing)
+        self.setFrameShape(self.NoFrame)
+        width = self.viewport().width() * 5
+        height = self.viewport().height() * 5
+        self.setSceneRect(  # always centered
+            -width/2, -height/2, width, height
+        )
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+
+class Ui_MainWindow:
+
+    def __init__(self):
+        self.setCentralWidget(self._graphics_view)
+        self.setWindowTitle('Rigid Packer')
+        self.statusBar().setStyleSheet('background-color: darkgray;')
+        self.resize(800, 600)
+
+    def updateStatusBar(self, item):
+        message = (
+            f'id: {item.id}'
+            f'    m: {round(item.total_mass)}'
+            f'    V: {round(item.area*1000)}'
+            f'   │   {item.name}'
+            )
+        self.statusBar().showMessage(message)

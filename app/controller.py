@@ -1,7 +1,7 @@
 from PyQt5.QtCore import Qt, pyqtSignal
 
 
-class InteractiveGraphicsMixin:
+class Ctrl_GraphicsItem:
 
     def __init__(self):
         self._being_moved = False
@@ -60,7 +60,7 @@ class InteractiveGraphicsMixin:
                 sibling.toggle_picked_up()
 
 
-class InteractiveSceneMixin:
+class Ctrl_GraphicsScene:
 
     hovered = pyqtSignal(object)
 
@@ -90,3 +90,38 @@ class InteractiveSceneMixin:
         # unpick picked up descendants
         for picked_up_descendant in picked_up_descendants:
             picked_up_descendant.toggle_picked_up()
+
+
+class Ctrl_GraphicsView:
+
+    def wheelEvent(self, event):
+        """https://stackoverflow.com/questions/19113532"""
+        self.setTransformationAnchor(self.NoAnchor)
+        pos = self.mapToScene(event.pos())
+        self.translate(pos.x(), pos.y())
+        zoom_factor = 1.0015**event.angleDelta().y()
+        self.scale(zoom_factor, zoom_factor)
+        self.translate(-pos.x(), -pos.y())
+
+    def keyPressEvent(self, event):
+        if event.key() in {Qt.Key_Minus, Qt.Key_Equal}:
+            self.setTransformationAnchor(self.NoAnchor)
+            center = (self.width() / 2, self.height() / 2)
+            pos = self.mapToScene(*center)
+            self.translate(pos.x(), pos.y())
+            zoom_factor = 1.2
+            if event.key() == Qt.Key_Minus:
+                zoom_factor = 1 / zoom_factor
+            self.scale(zoom_factor, zoom_factor)
+            self.translate(-pos.x(), -pos.y())
+        else:
+            super().keyPressEvent(event)
+
+
+class Ctrl_MainWindow:
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.close()
+        elif event.key() == Qt.Key_Space:
+            self._model.toggle_gentle()
