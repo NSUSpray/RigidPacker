@@ -21,8 +21,6 @@ class Ctrl_GraphicsItem:
             drag_point = self.scene().mapToBox2D(event.pos())
             item.start_dragging(drag_point)
         elif button == Qt.RightButton:
-            for picked_up_item in item.model.picked_up_items:
-                if item in picked_up_item.ancestors: return
             item.toggle_picked_up()
 
     def mouseMoveEvent(self, event):
@@ -38,8 +36,7 @@ class Ctrl_GraphicsItem:
         if self._being_moved:
             item.finish_dragging()
             self._being_moved = False
-        elif item.model.picked_up_items:  # just a mouse click, not a drag
-            if item.picked_up: return
+        else:  # just a mouse click, not a drag
             throwing_target = self.scene().mapToBox2D(event.pos())
             item.take_picked_up(throwing_target)
 
@@ -47,17 +44,7 @@ class Ctrl_GraphicsItem:
         event.accept()
         if event.button() != Qt.RightButton: return
         item = self._item
-        picked_up_descendants = \
-                set(item.descendants) & set(item.model.picked_up_items)
-        if picked_up_descendants:
-            # unpick picked up descendants
-            for picked_up_descendant in picked_up_descendants:
-                picked_up_descendant.toggle_picked_up()
-        else:
-            # pick up or give up all siblings
-            for sibling in item.parent.children:
-                if sibling.picked_up == item.picked_up: continue
-                sibling.toggle_picked_up()
+        item.unpick_descendants() or item.toggle_picked_up_siblings()
 
 
 class Ctrl_GraphicsScene:
@@ -76,7 +63,6 @@ class Ctrl_GraphicsScene:
         super().mousePressEvent(event)
         if event.isAccepted(): return
         if event.button() != Qt.LeftButton: return
-        if not self._model.picked_up_items: return
         throwing_target = self.mapToBox2D(event.scenePos())
         self._model.take_picked_up(throwing_target)
 
@@ -84,12 +70,8 @@ class Ctrl_GraphicsScene:
         super().mouseDoubleClickEvent(event)
         if event.isAccepted(): return
         if event.button() != Qt.RightButton: return
-        picked_up_descendants = \
-                set(self._model.descendants) & set(self._model.picked_up_items)
-        if not picked_up_descendants: return
-        # unpick picked up descendants
-        for picked_up_descendant in picked_up_descendants:
-            picked_up_descendant.toggle_picked_up()
+        model = self._model
+        model.unpick_descendants() or model.toggle_picked_up_siblings()
 
 
 class Ctrl_GraphicsView:

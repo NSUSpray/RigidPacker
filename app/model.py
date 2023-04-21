@@ -2,7 +2,7 @@ from typing import List
 from math import pi
 
 import pygame
-from PyQt5.QtCore import QThread, pyqtSignal, QTimer
+from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QApplication
 
 from repository import ItemData, Repository
@@ -74,6 +74,10 @@ class _BodyGraphicsContainer(
         # needed for a significant increase in performance in the main loop
         self.and_childrened_descendants: List[_BodyGraphicsContainer] = []
 
+    @property
+    def _picked_up_descendants(self):
+        return [item for item in self.descendants if item.picked_up]
+
     def stuff_by(self, new_children, throwing_target=None):
         if not self.children:
             for self_or_ancestor in (self, *self.ancestors):
@@ -82,7 +86,7 @@ class _BodyGraphicsContainer(
             for new_child in new_children:
                 self_or_ancestor.and_childrened_descendants += \
                         new_child.and_childrened_descendants
-        if not self.b2subworld: self._create_subworld()
+        self._create_subworld()
         super().stuff_by(new_children)
         for new_child in new_children: new_child.create_b2body()
         for self_or_ancestor in (self, *self.ancestors):
@@ -112,8 +116,7 @@ class _BodyGraphicsContainer(
         for ancestor in ancestors:
             ancestor.adjust_area()
             ancestor.adjust_total_mass()
-            for b2body in ancestor.b2subworld.bodies:
-                b2body.awake = True
+            ancestor._awake_b2bodies()
 
     def adjust_area(self):
         ''' calculate area with all children and adjust parent area '''
@@ -142,12 +145,12 @@ class _BodyGraphicsContainer(
         self.total_mass = total_mass
 
     def pinch(self):
-        self.model.hovered_item = self
+        self.model.hover_over(self)
         self._pinch_b2body()
         self.q_item.paintPinched()
 
     def release(self):
-        self.model.hovered_item = None
+        self.model.hover_over(None)
         self._release_b2body()
         if self.picked_up:
             self.q_item.paintPickedUp()
@@ -155,40 +158,54 @@ class _BodyGraphicsContainer(
             self.q_item.paintInitial()
 
     def start_dragging(self, drag_point):
-        self.drag_point = drag_point
-        self.b2body.bullet = True
+        self._start_dragging_b2body(drag_point)
 
-    def drag(self, drag_target):
-        self.drag_target = drag_target
-        self._release_b2body_calmly()
+    def drag(self, drag_target): self._drag_b2body(drag_target)
 
     def finish_dragging(self):
-        self.drag_target = None
-        def set_bullet_to_false(): self.b2body.bullet = False
-        QTimer.singleShot(3000, set_bullet_to_false)
+        self._finish_dragging_b2body()
         self.pinch()
 
-    def toggle_picked_up(self):
+    def _toggle_picked_up(self):
         self.picked_up = not self.picked_up
         if self.picked_up:
-            self.model.picked_up_items.append(self)
             self._release_b2body()
             self.q_item.paintPickedUp()
             for descendant in self.descendants:
                 descendant.q_item.paintPickedUpDescendant()
         else:
-            self.model.picked_up_items.remove(self)
             for item in (self, *self.descendants):
                 item.q_item.paintInitial()
 
+    def toggle_picked_up(self):
+        if set(self.descendants) & set(self.model._picked_up_descendants):
+            return
+        self._toggle_picked_up()
+
+    def toggle_picked_up_siblings(self):
+        if self.is_root: return
+        for sibling in self.parent.children:
+            if sibling.picked_up == self.picked_up: continue
+            sibling._toggle_picked_up()
+
+    def unpick_descendants(self):
+        picked_up_descendants = \
+            set(self.descendants) & set(self.model._picked_up_descendants)
+        if not picked_up_descendants: return False
+        # unpick picked up descendants
+        for picked_up_descendant in picked_up_descendants:
+            picked_up_descendant._toggle_picked_up()
+
     def take_picked_up(self, throwing_target):
-        picked_up_items = self.model.picked_up_items
+        if self.picked_up: return
+        picked_up_items = self.model._picked_up_descendants
+        if not picked_up_items: return
         for picked_up in picked_up_items:
             picked_up.shake_out()
         self.stuff_by(picked_up_items, throwing_target)
         self.model.repository.shift(picked_up_items, self)
-        for picked_up in picked_up_items[:]:
-            picked_up.toggle_picked_up()
+        for picked_up in picked_up_items:
+            picked_up._toggle_picked_up()
 
 
 class _UpdatableHierarchyMixin(QThread):
@@ -255,7 +272,6 @@ class Model(
         _UpdatableHierarchyMixin.__init__(self, target_fps)
         self.repository: Repository = repository
         self.hovered_item: _BodyGraphicsContainer = None
-        self.picked_up_items: List[_BodyGraphicsContainer] = []
 
     @property
     def target_fps(self):
@@ -278,3 +294,5 @@ class Model(
         container.stuff_by(children)
         QApplication.processEvents()
         for child in children: self.stuff(child)
+
+    def hover_over(self, item): self.hovered_item = item

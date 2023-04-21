@@ -2,6 +2,7 @@ from math import pi, sqrt, sin, cos, hypot, atan2
 from random import random
 
 from Box2D import b2World, b2Body, b2_staticBody, b2_dynamicBody
+from PyQt5.QtCore import QTimer
 
 from utilities.geometry import outersected
 
@@ -72,6 +73,19 @@ class _InteractiveBodyMixin:
     def _release_b2body_calmly(self):
         self.b2body.type = b2_dynamicBody
 
+    def _start_dragging_b2body(self, drag_point):
+        self.drag_point = drag_point
+        self.b2body.bullet = True
+
+    def _drag_b2body(self, drag_target):
+        self.drag_target = drag_target
+        self._release_b2body_calmly()
+
+    def _finish_dragging_b2body(self):
+        self.drag_target = None
+        def set_bullet_to_false(): self.b2body.bullet = False
+        QTimer.singleShot(3000, set_bullet_to_false)
+
     def drag_b2body(self):
         factor = -10.0 / self.total_mass  # real inertia
         # factor = -10.0 / sqrt(self.total_mass)  # compromise
@@ -97,6 +111,7 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
     def total_mass(self, mass): self.mass = mass
 
     def _create_subworld(self):
+        if self.b2subworld: return
         self.b2subworld = b2World(gravity=_ZERO_VECTOR)
 
     def destroy_b2body(self):
@@ -106,7 +121,7 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
     def create_b2body(self):
         if self.b2body:
             mass, area = self.total_mass, self.area
-            self.model.b2bodies_to_destroy.append(self.b2body)
+            self.model.queue_to_destroy(self)
         else:
             mass, area = self.self_mass, self.self_volume
         b2body = self.parent.b2subworld.CreateDynamicBody()
@@ -120,6 +135,10 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
         b2body.angularDamping = 1.0
         b2body.userData = self
         self.b2body = b2body
+
+    def _awake_b2bodies(self):
+        for b2body in self.b2subworld.bodies:
+            b2body.awake = True
 
     def throw_in(self, children, target=None):
         target = target or _ZERO_VECTOR
@@ -219,3 +238,6 @@ class BodyHierarchyMixin:
         for b2body in self.b2bodies_to_destroy:
             b2body.world.DestroyBody(b2body)
         self.b2bodies_to_destroy = []
+
+    def queue_to_destroy(self, item):
+        self.b2bodies_to_destroy.append(item.b2body)
