@@ -52,7 +52,7 @@ class Ctrl_GraphicsScene:
     hovered = pyqtSignal(object)
 
     def mapToBox2D(self, pos):
-        return [x/self.scale for x in (pos.x(), pos.y())]
+        return [x_or_y / self.scale for x_or_y in (pos.x(), pos.y())]
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)

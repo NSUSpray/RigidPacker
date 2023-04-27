@@ -91,9 +91,9 @@ class _InteractiveBodyMixin:
         # factor = -10.0 / sqrt(self._total_mass)  # compromise
         # factor = -10.0  # best dynamism
         velocity = [
-            (point + pos - target)*factor for point, target, pos
-                in zip(self.__drag_point, self._drag_target, self.position)
-            ]
+            (point+pos-target)*factor for point, target, pos
+            in zip(self.__drag_point, self._drag_target, self.position)
+        ]
         self._b2body.linearVelocity = velocity
 
 
@@ -118,7 +118,7 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
     @_total_mass.setter
     def _total_mass(self, mass): self._mass = mass
 
-    def _create_subworld(self):
+    def _create_b2subworld(self):
         if self.__b2subworld: return
         self.__b2subworld = b2World(gravity=_ZERO_VECTOR)
 
@@ -138,7 +138,7 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
             friction = 1.0,
             density = mass / area,
             restitution = 0.3,
-            )
+        )
         b2body.linearDamping = 1.0
         b2body.angularDamping = 1.0
         b2body.userData = self
@@ -167,13 +167,13 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
             angular_radius = child.radius * ratio
             azimuth = current_angle + angular_radius
             current_angle += 2*angular_radius
-            start = [distance*f(azimuth) for f in cos_sin]
+            start = [distance*fn(azimuth) for fn in cos_sin]
             factor = 5*random()
-            velocity = [factor*(t - s) for t, s in zip(target, start)]
+            velocity = [factor*(tg-st) for tg, st in zip(target, start)]
             child.position = start
             child._b2body.linearVelocity = velocity
 
-    def _b2subworld_step(self):
+    def _step_b2subworld(self):
         parent_radius = self.radius
         for child in self._children:
             outersected_ = outersected(
@@ -184,32 +184,33 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
         self.__b2subworld.Step(self._time_step, 10, 10)
         self.__b2subworld.ClearForces()
 
-    def _b2subworlds_step(self):
+    def _step_b2subworlds(self):
         '''
         for child in self._children:
             if not child._children: continue
-            child._b2subworlds_step()
-        self._b2subworld_step()
+            child._step_b2subworlds()
+        self._step_b2subworld()
         '''
         for item in self._and_childrened_descendants:
-            item._b2subworld_step()
+            item._step_b2subworld()
 
-    def _b2superworld_step(self): self._parent._b2subworld_step()
+    def _step_b2superworld(self): self._parent._step_b2subworld()
 
-    def _b2superworlds_step(self):
+    def _step_b2superworlds(self):
         '''
-        self._b2superworld_step()
-        if self._parent._parent: self._parent._b2superworlds_step()
+        self._step_b2superworld()
+        if self._parent._parent: self._parent._step_b2superworlds()
         '''
         for ancestor in self._ancestors:
-            ancestor._b2subworld_step()
+            ancestor._step_b2subworld()
 
 
 class BodyHierarchyMixin:
-    '''
+    """
     __radius, __total_mass, position, radius, _total_mass are dummies
     for root instances (without b2body)
-    '''
+    """
+
     def __init__(self):
         self.__radius: float
         self.__total_mass: float

@@ -5,11 +5,11 @@ from _ui import Ui_GraphicsItem, Ui_InteractiveGraphics, Ui_GraphicsScene
 
 
 class _Circle(
-        Ctrl_GraphicsItem,
-        QGraphicsEllipseItem,
-        Ui_GraphicsItem,
-        Ui_InteractiveGraphics,
-        ):
+    Ctrl_GraphicsItem,
+    QGraphicsEllipseItem,
+    Ui_GraphicsItem,
+    Ui_InteractiveGraphics,
+):
 
     def __init__(self, item, parent=None):
         self._item = item

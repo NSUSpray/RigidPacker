@@ -21,7 +21,7 @@ _PACKING_SPECIFIC_AREA = {
     # 18: 1.314200547,
     # 19: 1.245032098,
     # 20: 1.31225645,
-    }
+}
 
 
 def outersected(child_radius, parent_radius, distance):
@@ -41,14 +41,13 @@ def intersected(child_radius, parent_radius, distance):
 
 
 def packing_specific_area(radii):
-    '''
+    """
     Returns the ratio of enclosing circle’s sufficient area
     to the enclosed circles total area.
-    '''
+    """
     number = len(radii)
     if number == 2:
         # exact solution
-        return sum(radii)**2 / sum(r*r for r in radii) 
-    if number <= 17: return _PACKING_SPECIFIC_AREA[number]
-    # lower bound for all remaining
-    return _PACKING_SPECIFIC_AREA[17]
+        return sum(radii)**2 / sum(r*r for r in radii)
+    max_key = max(_PACKING_SPECIFIC_AREA)
+    return _PACKING_SPECIFIC_AREA[min(number, max_key)]

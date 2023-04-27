@@ -57,16 +57,23 @@ class _ContainerItem(ItemData):
 
 
 class _BodyGraphicsContainer(
-        BodyContainerMixin,
-        GraphicsContainerMixin,
-        _ContainerItem,
-        ):
+    BodyContainerMixin,
+    GraphicsContainerMixin,
+    _ContainerItem,
+):
 
     # shape area ~ real item volume
 
     def __init__(self, item, target_fps):
-        _ContainerItem.__init__(self, item.id, item.name, item.product_name)
-        BodyContainerMixin.__init__(self, 1.0/target_fps)
+        _ContainerItem.__init__(
+            self,
+            item.id,
+            item.name,
+            item.product_name,
+            item.self_mass,
+            item.self_volume,
+        )
+        BodyContainerMixin.__init__(self, 1.0 / target_fps)
         GraphicsContainerMixin.__init__(self)
         self.__picked_up = False
         self._model: Model
@@ -75,7 +82,7 @@ class _BodyGraphicsContainer(
         self._and_childrened_descendants: List[_BodyGraphicsContainer] = []
 
     def __adjust_area(self):
-        ''' calculate area with all children and adjust parent area '''
+        """Calculate area with all children and adjust parent area."""
         area = self.self_volume
         if self._children:
             children_len = len(self._children)
@@ -87,13 +94,13 @@ class _BodyGraphicsContainer(
                 area1 = area + children_area
                 area2 = packing_specific_area(radii) * children_area
                 top2radii = sum(radii[-2:])
-                area3 = pi * top2radii*top2radii
+                area3 = pi * top2radii * top2radii
                 area = max(area1, area2, area3)
         self._area = area
         if self._parent: self._q_item.setRadius(self.radius)
 
     def __adjust_total_mass(self):
-        ''' calculate mass with all children and adjust parent mass '''
+        """Calculate mass with all children and adjust parent mass."""
         total_mass = self.self_mass
         if self._children:
             children_mass = sum(child._total_mass for child in self._children)
@@ -112,8 +119,8 @@ class _BodyGraphicsContainer(
             for descendant in self._descendants:
                 descendant._q_item.paintPickedUpDescendant()
         else:
-            for item in (self, *self._descendants):
-                item._q_item.paintInitial()
+            for self_or_descendant in (self, *self._descendants):
+                self_or_descendant._q_item.paintInitial()
 
     def stuff_by(self, new_children, throwing_target=None):
         if not self._children:
@@ -123,7 +130,7 @@ class _BodyGraphicsContainer(
             for new_child in new_children:
                 self_or_ancestor._and_childrened_descendants += \
                         new_child._and_childrened_descendants
-        self._create_subworld()
+        self._create_b2subworld()
         super().stuff_by(new_children)
         for new_child in new_children: new_child._create_b2body()
         for self_or_ancestor in (self, *self._ancestors):
@@ -146,7 +153,7 @@ class _BodyGraphicsContainer(
                     in self._and_childrened_descendants:
                 ancestor._and_childrened_descendants.remove(
                     self_or_childrened_descendant
-                    )
+                )
         if not parent._children:
             for ancestor in ancestors:
                 ancestor._and_childrened_descendants.remove(parent)
@@ -223,8 +230,8 @@ class _UpdatableHierarchyMixin(QThread):
     def __del__(self): pygame.quit()
 
     def run(self):
-        b2subworld_step = self._b2subworld_step
-        b2subworlds_step = self._b2subworlds_step
+        step_b2subworld = self._step_b2subworld
+        step_b2subworlds = self._step_b2subworlds
         updated_emit = self.updated.emit
         clock = pygame.time.Clock()
         tick = clock.tick
@@ -236,14 +243,14 @@ class _UpdatableHierarchyMixin(QThread):
             if self.__gentle:
                 hovered = self.__hovered_item
                 if hovered:
-                    if hovered._children: hovered._b2subworld_step()
-                    if hovered._parent: hovered._b2superworlds_step()
+                    if hovered._children: hovered._step_b2subworld()
+                    if hovered._parent: hovered._step_b2superworlds()
                 else:
-                    b2subworld_step()
+                    step_b2subworld()
             else:
-                b2subworlds_step()  # 25–13% CPU
+                step_b2subworlds()  # 25–13% CPU
             '''
-            b2subworlds_step()  # 25–13% CPU
+            step_b2subworlds()  # 25–13% CPU
             if self._b2bodies_to_destroy: self._destroy_b2bodies_to_destroy()
             updated_emit()  # 17–5% CPU
             tick(self._target_fps)
@@ -256,14 +263,14 @@ class _UpdatableHierarchyMixin(QThread):
     def toggle_gentle(self): self.__gentle = not self.__gentle
 
 
-class Model(
-        BodyHierarchyMixin,
-        GraphicsHierarchyMixin,
-        _BodyGraphicsContainer,
-        _UpdatableHierarchyMixin,
-        ):
 
-    ''' Has connection to the database and can stuff self recursively '''
+class Model(
+    BodyHierarchyMixin,
+    GraphicsHierarchyMixin,
+    _BodyGraphicsContainer,
+    _UpdatableHierarchyMixin,
+):
+    """Has connection to the database and can stuff self recursively."""
 
     def __init__(self, repository, target_fps):
         _BodyGraphicsContainer.__init__(self, repository._root, target_fps)
@@ -274,23 +281,22 @@ class Model(
         self._repository: Repository = repository
 
     @property
-    def target_fps(self):
-        return self._target_fps
+    def target_fps(self): return self._target_fps
 
     @target_fps.setter
     def target_fps(self, fps):
         self._target_fps = fps
-        self._set_time_step(1.0/fps)
+        self._set_time_step(1.0 / fps)
 
     def stuff(self, container=None):
-        ''' create and place all container’s descendants '''
+        """Create and place all container’s descendants."""
         container = container or self
         container._model = self
         protos = self._repository.children_of(container)
         if not protos: return
         children = [
             _BodyGraphicsContainer(proto, self._target_fps) for proto in protos
-            ]
+        ]
         container.stuff_by(children)
         QApplication.processEvents()
         for child in children: self.stuff(child)

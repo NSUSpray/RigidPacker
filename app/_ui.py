@@ -94,10 +94,10 @@ class Ui_GraphicsView:
 class Ui_MainWindow:
 
     def __init__(self):
-        self.setCentralWidget(self._graphics_view)
         self.setWindowTitle('Rigid Packer')
         self.statusBar().setStyleSheet('background-color: darkgray;')
         self.resize(800, 600)
+        self.setCentralWidget(self._graphics_view)
 
     def updateStatusBar(self, item):
         message = (

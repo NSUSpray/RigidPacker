@@ -27,7 +27,6 @@ class MainWindow(Ctrl_MainWindow, QMainWindow, Ui_MainWindow):
         model._q_scene.hovered.connect(self.updateStatusBar)
 
 
-
 app = QApplication([])
 repository = Repository('../sample.db')
 model = Model(repository, target_fps=30.0385)
