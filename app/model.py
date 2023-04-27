@@ -15,45 +15,45 @@ class _ContainerItem(ItemData):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.parent: _ContainerItem = None
-        self.children: List[_ContainerItem] = []
+        self._parent: _ContainerItem = None
+        self._children: List[_ContainerItem] = []
         # needed for a marginal increase in performance in the main loop
-        self.ancestors: List[_ContainerItem] = []
-        self.descendants: List[_ContainerItem] = []
+        self._ancestors: List[_ContainerItem] = []
+        self._descendants: List[_ContainerItem] = []
 
     '''
     @property
-    def ancestors(self):
-        return (self.parent, *self.parent.ancestors) if self.parent else ()
-        # yield self.parent or ()
-        # for ancestor in self.parent.ancestors: yield ancestor
+    def _ancestors(self):
+        return (self._parent, *self._parent._ancestors) if self._parent else ()
+        # yield self._parent or ()
+        # for ancestor in self._parent._ancestors: yield ancestor
     '''
 
     @property
     def nesting_level(self):
-        return self.parent.nesting_level + 1 if self.parent else 0
+        return self._parent.nesting_level + 1 if self._parent else 0
 
     def stuff_by(self, new_children):
-        self.children += new_children  # +C
-        self_and_ancestors = (self, *self.ancestors)
+        self._children += new_children  # +C
+        self_and_ancestors = (self, *self._ancestors)
         for new_child in new_children:
-            new_child.parent = self  # +P
-            new_child_and_descendants = (new_child, *new_child.descendants)
+            new_child._parent = self  # +P
+            new_child_and_descendants = (new_child, *new_child._descendants)
             for new_child_or_descendant in new_child_and_descendants:  # +DA
-                new_child_or_descendant.ancestors += self_and_ancestors
+                new_child_or_descendant._ancestors += self_and_ancestors
             for self_or_ancestor in self_and_ancestors:  # +AD
-                self_or_ancestor.descendants += new_child_and_descendants
+                self_or_ancestor._descendants += new_child_and_descendants
 
     def shake_out(self):
-        self_and_descendants = (self, *self.descendants)
-        for ancestor in self.ancestors:
+        self_and_descendants = (self, *self._descendants)
+        for ancestor in self._ancestors:
             for self_or_descendant in self_and_descendants:  # −AD
-                ancestor.descendants.remove(self_or_descendant)
-            for descendant in self.descendants:  # −DA
-                descendant.ancestors.remove(ancestor)
-        self.ancestors = []  # −DA
-        self.parent.children.remove(self)  # −C
-        self.parent = None  # −P
+                ancestor._descendants.remove(self_or_descendant)
+            for descendant in self._descendants:  # −DA
+                descendant._ancestors.remove(ancestor)
+        self._ancestors = []  # −DA
+        self._parent._children.remove(self)  # −C
+        self._parent = None  # −P
 
 
 class _BodyGraphicsContainer(
@@ -68,94 +68,105 @@ class _BodyGraphicsContainer(
         _ContainerItem.__init__(self, item.id, item.name, item.product_name)
         BodyContainerMixin.__init__(self, 1.0/target_fps)
         GraphicsContainerMixin.__init__(self)
-        self.picked_up = False
-        self.model: Model
+        self.__picked_up = False
+        self._model: Model
         # self if it has children + descendants with children
         # needed for a significant increase in performance in the main loop
-        self.and_childrened_descendants: List[_BodyGraphicsContainer] = []
+        self._and_childrened_descendants: List[_BodyGraphicsContainer] = []
 
-    @property
-    def _picked_up_descendants(self):
-        return [item for item in self.descendants if item.picked_up]
-
-    def stuff_by(self, new_children, throwing_target=None):
-        if not self.children:
-            for self_or_ancestor in (self, *self.ancestors):
-                self_or_ancestor.and_childrened_descendants.append(self)
-        for self_or_ancestor in (self, *self.ancestors):
-            for new_child in new_children:
-                self_or_ancestor.and_childrened_descendants += \
-                        new_child.and_childrened_descendants
-        self._create_subworld()
-        super().stuff_by(new_children)
-        for new_child in new_children: new_child.create_b2body()
-        for self_or_ancestor in (self, *self.ancestors):
-            self_or_ancestor.adjust_area()
-            self_or_ancestor.adjust_total_mass()
-        self.throw_in(new_children, throwing_target)
-        for new_child in new_children:
-            if new_child.q_item:
-                new_child.adopt_parent_q_item()
-            else:
-                new_child.create_q_item()
-            new_child.move_q_item()
-
-    def shake_out(self):
-        parent = self.parent
-        ancestors = self.ancestors[:]
-        super().shake_out()
-        for ancestor in ancestors:
-            for self_or_childrened_descendant \
-                    in self.and_childrened_descendants:
-                ancestor.and_childrened_descendants.remove(
-                    self_or_childrened_descendant
-                    )
-        if not parent.children:
-            for ancestor in ancestors:
-                ancestor.and_childrened_descendants.remove(parent)
-        for ancestor in ancestors:
-            ancestor.adjust_area()
-            ancestor.adjust_total_mass()
-            ancestor._awake_b2bodies()
-
-    def adjust_area(self):
+    def __adjust_area(self):
         ''' calculate area with all children and adjust parent area '''
         area = self.self_volume
-        if self.children:
-            children_len = len(self.children)
-            children_area = sum(child.area for child in self.children)
+        if self._children:
+            children_len = len(self._children)
+            children_area = sum(child._area for child in self._children)
             if children_len == 1:
                 area += children_area
             else:
-                radii = sorted(child.radius for child in self.children)
+                radii = sorted(child.radius for child in self._children)
                 area1 = area + children_area
                 area2 = packing_specific_area(radii) * children_area
                 top2radii = sum(radii[-2:])
                 area3 = pi * top2radii*top2radii
                 area = max(area1, area2, area3)
-        self.area = area
-        if self.parent: self.q_item.setRadius(self.radius)
+        self._area = area
+        if self._parent: self._q_item.setRadius(self.radius)
 
-    def adjust_total_mass(self):
+    def __adjust_total_mass(self):
         ''' calculate mass with all children and adjust parent mass '''
         total_mass = self.self_mass
-        if self.children:
-            children_mass = sum(child.total_mass for child in self.children)
+        if self._children:
+            children_mass = sum(child._total_mass for child in self._children)
             total_mass += children_mass
-        self.total_mass = total_mass
+        self._total_mass = total_mass
+
+    @property
+    def __picked_up_descendants(self):
+        return [item for item in self._descendants if item.__picked_up]
+
+    def __toggle_picked_up(self):
+        self.__picked_up = not self.__picked_up
+        if self.__picked_up:
+            self._release_b2body()
+            self._q_item.paintPickedUp()
+            for descendant in self._descendants:
+                descendant._q_item.paintPickedUpDescendant()
+        else:
+            for item in (self, *self._descendants):
+                item._q_item.paintInitial()
+
+    def stuff_by(self, new_children, throwing_target=None):
+        if not self._children:
+            for self_or_ancestor in (self, *self._ancestors):
+                self_or_ancestor._and_childrened_descendants.append(self)
+        for self_or_ancestor in (self, *self._ancestors):
+            for new_child in new_children:
+                self_or_ancestor._and_childrened_descendants += \
+                        new_child._and_childrened_descendants
+        self._create_subworld()
+        super().stuff_by(new_children)
+        for new_child in new_children: new_child._create_b2body()
+        for self_or_ancestor in (self, *self._ancestors):
+            self_or_ancestor.__adjust_area()
+            self_or_ancestor.__adjust_total_mass()
+        self._throw_in(new_children, throwing_target)
+        for new_child in new_children:
+            if new_child._q_item:
+                new_child._adopt_parent_q_item()
+            else:
+                new_child._create_q_item()
+            new_child.move_q_item()
+
+    def shake_out(self):
+        parent = self._parent
+        ancestors = self._ancestors[:]
+        super().shake_out()
+        for ancestor in ancestors:
+            for self_or_childrened_descendant \
+                    in self._and_childrened_descendants:
+                ancestor._and_childrened_descendants.remove(
+                    self_or_childrened_descendant
+                    )
+        if not parent._children:
+            for ancestor in ancestors:
+                ancestor._and_childrened_descendants.remove(parent)
+        for ancestor in ancestors:
+            ancestor.__adjust_area()
+            ancestor.__adjust_total_mass()
+            ancestor._awake_b2bodies()
 
     def pinch(self):
-        self.model.hover_over(self)
+        self._model.hover_over(self)
         self._pinch_b2body()
-        self.q_item.paintPinched()
+        self._q_item.paintPinched()
 
     def release(self):
-        self.model.hover_over(None)
+        self._model.hover_over(None)
         self._release_b2body()
-        if self.picked_up:
-            self.q_item.paintPickedUp()
+        if self.__picked_up:
+            self._q_item.paintPickedUp()
         else:
-            self.q_item.paintInitial()
+            self._q_item.paintInitial()
 
     def start_dragging(self, drag_point):
         self._start_dragging_b2body(drag_point)
@@ -166,46 +177,35 @@ class _BodyGraphicsContainer(
         self._finish_dragging_b2body()
         self.pinch()
 
-    def _toggle_picked_up(self):
-        self.picked_up = not self.picked_up
-        if self.picked_up:
-            self._release_b2body()
-            self.q_item.paintPickedUp()
-            for descendant in self.descendants:
-                descendant.q_item.paintPickedUpDescendant()
-        else:
-            for item in (self, *self.descendants):
-                item.q_item.paintInitial()
-
     def toggle_picked_up(self):
-        if set(self.descendants) & set(self.model._picked_up_descendants):
+        if set(self._descendants) & set(self._model.__picked_up_descendants):
             return
-        self._toggle_picked_up()
+        self.__toggle_picked_up()
 
     def toggle_picked_up_siblings(self):
         if self.is_root: return
-        for sibling in self.parent.children:
-            if sibling.picked_up == self.picked_up: continue
-            sibling._toggle_picked_up()
+        for sibling in self._parent._children:
+            if sibling.__picked_up == self.__picked_up: continue
+            sibling.__toggle_picked_up()
 
     def unpick_descendants(self):
         picked_up_descendants = \
-            set(self.descendants) & set(self.model._picked_up_descendants)
+            set(self._descendants) & set(self._model.__picked_up_descendants)
         if not picked_up_descendants: return False
         # unpick picked up descendants
         for picked_up_descendant in picked_up_descendants:
-            picked_up_descendant._toggle_picked_up()
+            picked_up_descendant.__toggle_picked_up()
 
     def take_picked_up(self, throwing_target):
-        if self.picked_up: return
-        picked_up_items = self.model._picked_up_descendants
+        if self.__picked_up: return
+        picked_up_items = self._model.__picked_up_descendants
         if not picked_up_items: return
         for picked_up in picked_up_items:
             picked_up.shake_out()
         self.stuff_by(picked_up_items, throwing_target)
-        self.model.repository.shift(picked_up_items, self)
+        self._model._repository.shift(picked_up_items, self)
         for picked_up in picked_up_items:
-            picked_up._toggle_picked_up()
+            picked_up.__toggle_picked_up()
 
 
 class _UpdatableHierarchyMixin(QThread):
@@ -215,45 +215,45 @@ class _UpdatableHierarchyMixin(QThread):
     def __init__(self, target_fps):
         super().__init__()
         pygame.init()
-        self._running: bool
+        self.__running: bool
+        self.__gentle = False
         self._target_fps = target_fps
-        self.gentle = False
-        self.updated.connect(self.move_q_items)
+        self.updated.connect(self._move_q_items)
 
     def __del__(self): pygame.quit()
 
     def run(self):
-        b2subworld_step = self.b2subworld_step
-        b2subworlds_step = self.b2subworlds_step
+        b2subworld_step = self._b2subworld_step
+        b2subworlds_step = self._b2subworlds_step
         updated_emit = self.updated.emit
         clock = pygame.time.Clock()
         tick = clock.tick
-        self._running = True
-        while self._running and not self.children:
-            tick(self.target_fps)
-        while self._running:
+        self.__running = True
+        while self.__running and not self._children:
+            tick(self._target_fps)
+        while self.__running:
             '''
-            if self.gentle:
-                hovered = self.hovered_item
+            if self.__gentle:
+                hovered = self.__hovered_item
                 if hovered:
-                    if hovered.children: hovered.b2subworld_step()
-                    if hovered.parent: hovered.b2superworlds_step()
+                    if hovered._children: hovered._b2subworld_step()
+                    if hovered._parent: hovered._b2superworlds_step()
                 else:
                     b2subworld_step()
             else:
                 b2subworlds_step()  # 25–13% CPU
             '''
             b2subworlds_step()  # 25–13% CPU
-            if self.b2bodies_to_destroy: self._destroy_b2bodies_to_destroy()
+            if self._b2bodies_to_destroy: self._destroy_b2bodies_to_destroy()
             updated_emit()  # 17–5% CPU
-            tick(self.target_fps)
+            tick(self._target_fps)
 
     def quit(self):
-        self._running = False
+        self.__running = False
         super().quit()
         self.wait()
 
-    def toggle_gentle(self): self.gentle = not self.gentle
+    def toggle_gentle(self): self.__gentle = not self.__gentle
 
 
 class Model(
@@ -266,12 +266,12 @@ class Model(
     ''' Has connection to the database and can stuff self recursively '''
 
     def __init__(self, repository, target_fps):
-        _BodyGraphicsContainer.__init__(self, repository.root, target_fps)
+        _BodyGraphicsContainer.__init__(self, repository._root, target_fps)
         BodyHierarchyMixin.__init__(self)
         GraphicsHierarchyMixin.__init__(self)
         _UpdatableHierarchyMixin.__init__(self, target_fps)
-        self.repository: Repository = repository
-        self.hovered_item: _BodyGraphicsContainer = None
+        self.__hovered_item: _BodyGraphicsContainer = None
+        self._repository: Repository = repository
 
     @property
     def target_fps(self):
@@ -285,8 +285,8 @@ class Model(
     def stuff(self, container=None):
         ''' create and place all container’s descendants '''
         container = container or self
-        container.model = self
-        protos = self.repository.children_of(container)
+        container._model = self
+        protos = self._repository.children_of(container)
         if not protos: return
         children = [
             _BodyGraphicsContainer(proto, self._target_fps) for proto in protos
@@ -295,4 +295,4 @@ class Model(
         QApplication.processEvents()
         for child in children: self.stuff(child)
 
-    def hover_over(self, item): self.hovered_item = item
+    def hover_over(self, item): self.__hovered_item = item

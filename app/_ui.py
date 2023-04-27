@@ -9,10 +9,10 @@ class Ui_GraphicsItem:
     initialPen = Qt.transparent
 
     def __init__(self):
-        self.initialBrush = self._make_color()
+        self.initialBrush = self.__make_color()
         self.paintInitial()
 
-    def _make_color(self):
+    def __make_color(self):
         name = self._item.name
         first_letter = name[0].lower()
         if first_letter == 'ё': first_letter = 'е'
@@ -45,8 +45,8 @@ class Ui_InteractiveGraphics:
     pickedBrush = Qt.transparent
 
     def paintInitial(self):
-        # for child in item.children:
-        #     child.q_item.setFlag(self.ItemClipsToShape, enabled=False)
+        # for child in item._children:
+        #     child._q_item.setFlag(self.ItemClipsToShape, enabled=False)
         self.setZValue(0)
         self.setAcceptedMouseButtons(Qt.AllButtons)
         self.setAcceptHoverEvents(True)
@@ -56,8 +56,8 @@ class Ui_InteractiveGraphics:
         # self.setFlag(self.ItemClipsToShape)
         self.setFlag(self.ItemClipsChildrenToShape, enabled=False)
         self.setFlag(self.ItemContainsChildrenInShape, enabled=False)
-        # for child in item.children:
-        #     child.q_item.setFlag(self.ItemClipsToShape)
+        # for child in item._children:
+        #     child._q_item.setFlag(self.ItemClipsToShape)
         self.setZValue(1)
 
     def paintPickedUp(self):
@@ -102,8 +102,8 @@ class Ui_MainWindow:
     def updateStatusBar(self, item):
         message = (
             f'id: {item.id}'
-            f'    m: {round(item.total_mass)}'
-            f'    V: {round(item.area*1000)}'
+            f'    m: {round(item._total_mass)}'
+            f'    V: {round(item._area*1000)}'
             f'   │   {item.name}'
             )
         self.statusBar().showMessage(message)

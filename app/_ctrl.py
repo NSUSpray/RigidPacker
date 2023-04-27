@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 class Ctrl_GraphicsItem:
 
     def __init__(self):
-        self._being_moved = False
+        self.__being_moved = False
 
     def hoverEnterEvent(self, event):
         self._item.pinch()
@@ -26,16 +26,16 @@ class Ctrl_GraphicsItem:
     def mouseMoveEvent(self, event):
         event.accept()
         if event.buttons() != Qt.LeftButton: return
-        self._being_moved = True
+        self.__being_moved = True
         drag_target = self.scene().mapToBox2D(self.mapToParent(event.pos()))
         self._item.drag(drag_target)
 
     def mouseReleaseEvent(self, event):
         if event.button() != Qt.LeftButton: return
         item = self._item
-        if self._being_moved:
+        if self.__being_moved:
             item.finish_dragging()
-            self._being_moved = False
+            self.__being_moved = False
         else:  # just a mouse click, not a drag
             throwing_target = self.scene().mapToBox2D(event.pos())
             item.take_picked_up(throwing_target)

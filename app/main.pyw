@@ -20,11 +20,11 @@ class MainWindow(Ctrl_MainWindow, QMainWindow, Ui_MainWindow):
     def __init__(self, model, *args, **kwargs):
         self._model: Model = model
         self._graphics_view = GraphicsView()
-        self._graphics_view.setScene(model.q_scene)
+        self._graphics_view.setScene(model._q_scene)
         QMainWindow.__init__(self, *args, **kwargs)
         Ctrl_MainWindow.__init__(self)
         Ui_MainWindow.__init__(self)
-        model.q_scene.hovered.connect(self.updateStatusBar)
+        model._q_scene.hovered.connect(self.updateStatusBar)
 
 
 

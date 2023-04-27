@@ -37,24 +37,24 @@ class Repository:
     root_name = 'root'
 
     def __init__(self, filename):
-        self._connect = sqlite3.connect(filename)
-        self._cursor = self._connect.cursor()
-        self._arrangement_id: int
+        self.__connect = sqlite3.connect(filename)
+        self.__cursor = self.__connect.cursor()
+        self.__arrangement_id: int
+        self._root = ItemData(self.root_id, self.root_name)
         self.arrangement = self.default_arrangement
-        self.root = ItemData(self.root_id, self.root_name)
 
     def __del__(self):
-        self._cursor.close()
-        self._connect.close()
+        self.__cursor.close()
+        self.__connect.close()
 
     @property
     def arrangement(self):
         request = '''
             SELECT name FROM arrangement WHERE arrangement_id IS ?
             '''
-        data = (self._arrangement_id,)
-        self._cursor.execute(request, data)
-        response = self._cursor.fetchone()
+        data = (self.__arrangement_id,)
+        self.__cursor.execute(request, data)
+        response = self.__cursor.fetchone()
         if response: return response[0]
 
     @arrangement.setter
@@ -63,10 +63,10 @@ class Repository:
             SELECT arrangement_id FROM arrangement WHERE name IS ?
             '''
         data = (name,)
-        self._cursor.execute(request, data)
-        response = self._cursor.fetchone()
+        self.__cursor.execute(request, data)
+        response = self.__cursor.fetchone()
         if not response: raise ValueError
-        self._arrangement_id = response[0]
+        self.__arrangement_id = response[0]
 
     def children_of(self, item):
         request = '''
@@ -74,9 +74,9 @@ class Repository:
             FROM placement LEFT JOIN item USING(item_id)
             WHERE parent_id IS ? AND arrangement_id IS ?
             '''
-        data = (item.id or None, self._arrangement_id)
-        self._cursor.execute(request, data)
-        response = self._cursor.fetchall()
+        data = (item.id or None, self.__arrangement_id)
+        self.__cursor.execute(request, data)
+        response = self.__cursor.fetchall()
         return [ItemData(*fields) for fields in response]
 
     def shift(self, items, parent):
@@ -85,6 +85,6 @@ class Repository:
             WHERE item_id IN (%s) AND arrangement_id IS ?
             ''' % ','.join('?' * len(items))
         item_ids = [item.id for item in items]
-        data = (parent.id or None, *item_ids, self._arrangement_id)
-        self._cursor.execute(request, data)
-        self._connect.commit()
+        data = (parent.id or None, *item_ids, self.__arrangement_id)
+        self.__cursor.execute(request, data)
+        self.__connect.commit()

@@ -13,88 +13,88 @@ _ZERO_VECTOR = (0.0, 0.0)
 class _BodyBase:
 
     def __init__(self):
-        self.b2body: b2Body = None
+        self._b2body: b2Body = None
 
     @property
-    def position(self): return self.b2body.position
+    def __fixture(self): return self._b2body.fixtures[0]
+    @property
+    def __shape(self): return self.__fixture.shape
+
+    @property
+    def __density(self): return self.__fixture.density
+
+    @__density.setter
+    def __density(self, density):
+        self.__fixture.density = density
+        self._b2body.ResetMassData()
+
+    @property
+    def _area(self): r = self.radius; return pi * r*r
+    @_area.setter
+    def _area(self, area): self.radius = sqrt(area/pi)
+
+    @property
+    def _mass(self): return self._b2body.mass or self.__density*self._area
+    # density-area option is needed when the body is static (pinched)
+
+    @_mass.setter
+    def _mass(self, mass): self.__density = mass / self._area
+
+    @property
+    def position(self): return self._b2body.position
     @position.setter
-    def position(self, position): self.b2body.position = position
+    def position(self, position): self._b2body.position = position
 
     @property
-    def _fixture(self): return self.b2body.fixtures[0]
-    @property
-    def _shape(self): return self._fixture.shape
-
-    @property
-    def radius(self): return self._shape.radius
+    def radius(self): return self.__shape.radius
 
     @radius.setter
     def radius(self, radius):
-        mass = self.mass
-        self._shape.radius = radius
-        self.density = mass / self.area
-
-    @property
-    def area(self): r = self.radius; return pi * r*r
-    @area.setter
-    def area(self, area): self.radius = sqrt(area/pi)
-
-    @property
-    def mass(self): return self.b2body.mass or self.density*self.area
-    # density-area option is needed when the body is static (pinched)
-
-    @mass.setter
-    def mass(self, mass): self.density = mass / self.area
-
-    @property
-    def density(self): return self._fixture.density
-
-    @density.setter
-    def density(self, density):
-        self._fixture.density = density
-        self.b2body.ResetMassData()
+        mass = self._mass
+        self.__shape.radius = radius
+        self.__density = mass / self._area
 
 
 class _InteractiveBodyMixin:
 
     def __init__(self):
-        self._last_velocity = _ZERO_VECTOR
-        self.drag_point = _ZERO_VECTOR
-        self.drag_target = None
+        self.__last_velocity = _ZERO_VECTOR
+        self.__drag_point = _ZERO_VECTOR
+        self._drag_target = None
 
     def _pinch_b2body(self):
-        self._last_velocity = self.b2body.linearVelocity.copy()
-        self.b2body.type = b2_staticBody
+        self.__last_velocity = self._b2body.linearVelocity.copy()
+        self._b2body.type = b2_staticBody
 
     def _release_b2body(self):
-        self.b2body.type = b2_dynamicBody
-        self.b2body.linearVelocity = self._last_velocity
+        self._b2body.type = b2_dynamicBody
+        self._b2body.linearVelocity = self.__last_velocity
 
     def _release_b2body_calmly(self):
-        self.b2body.type = b2_dynamicBody
+        self._b2body.type = b2_dynamicBody
 
     def _start_dragging_b2body(self, drag_point):
-        self.drag_point = drag_point
-        self.b2body.bullet = True
+        self.__drag_point = drag_point
+        self._b2body.bullet = True
 
     def _drag_b2body(self, drag_target):
-        self.drag_target = drag_target
+        self._drag_target = drag_target
         self._release_b2body_calmly()
 
     def _finish_dragging_b2body(self):
-        self.drag_target = None
-        def set_bullet_to_false(): self.b2body.bullet = False
+        self._drag_target = None
+        def set_bullet_to_false(): self._b2body.bullet = False
         QTimer.singleShot(3000, set_bullet_to_false)
 
     def drag_b2body(self):
-        factor = -10.0 / self.total_mass  # real inertia
-        # factor = -10.0 / sqrt(self.total_mass)  # compromise
+        factor = -10.0 / self._total_mass  # real inertia
+        # factor = -10.0 / sqrt(self._total_mass)  # compromise
         # factor = -10.0  # best dynamism
         velocity = [
             (point + pos - target)*factor for point, target, pos
-                in zip(self.drag_point, self.drag_target, self.position)
+                in zip(self.__drag_point, self._drag_target, self.position)
             ]
-        self.b2body.linearVelocity = velocity
+        self._b2body.linearVelocity = velocity
 
 
 class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
@@ -102,29 +102,37 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
     def __init__(self, time_step):
         _InteractiveBodyMixin.__init__(self)
         _BodyBase.__init__(self)
-        self.time_step = time_step
-        self.b2subworld: b2World = None
+        self.__b2subworld: b2World = None
+        self._time_step = time_step
+
+    def __rake_in(self, outersected_):
+        radius = self.radius
+        position = self.position
+        factor = -3000.0*outersected_ * radius*radius / position.length
+        force = [pos*factor for pos in position]
+        # point = (0.0, 0.0)  # TODO: touchpoint
+        self._b2body.ApplyForce(force=force, point=_ZERO_VECTOR, wake=False)
 
     @property
-    def total_mass(self): return self.mass
-    @total_mass.setter
-    def total_mass(self, mass): self.mass = mass
+    def _total_mass(self): return self._mass
+    @_total_mass.setter
+    def _total_mass(self, mass): self._mass = mass
 
     def _create_subworld(self):
-        if self.b2subworld: return
-        self.b2subworld = b2World(gravity=_ZERO_VECTOR)
+        if self.__b2subworld: return
+        self.__b2subworld = b2World(gravity=_ZERO_VECTOR)
 
     def destroy_b2body(self):
-        self.parent.b2subworld.DestroyBody(self.b2body)
-        self.b2body = None
+        self._parent.__b2subworld.DestroyBody(self._b2body)
+        self._b2body = None
 
-    def create_b2body(self):
-        if self.b2body:
-            mass, area = self.total_mass, self.area
-            self.model.queue_to_destroy(self)
+    def _create_b2body(self):
+        if self._b2body:
+            mass, area = self._total_mass, self._area
+            self._model.queue_to_destroy(self)
         else:
             mass, area = self.self_mass, self.self_volume
-        b2body = self.parent.b2subworld.CreateDynamicBody()
+        b2body = self._parent.__b2subworld.CreateDynamicBody()
         b2body.CreateCircleFixture(
             radius = sqrt(area/pi),
             friction = 1.0,
@@ -134,13 +142,13 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
         b2body.linearDamping = 1.0
         b2body.angularDamping = 1.0
         b2body.userData = self
-        self.b2body = b2body
+        self._b2body = b2body
 
     def _awake_b2bodies(self):
-        for b2body in self.b2subworld.bodies:
+        for b2body in self.__b2subworld.bodies:
             b2body.awake = True
 
-    def throw_in(self, children, target=None):
+    def _throw_in(self, children, target=None):
         target = target or _ZERO_VECTOR
         target_radius = hypot(*target)
         '''
@@ -163,81 +171,75 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
             factor = 5*random()
             velocity = [factor*(t - s) for t, s in zip(target, start)]
             child.position = start
-            child.b2body.linearVelocity = velocity
+            child._b2body.linearVelocity = velocity
 
-    def rake_in(self, outersected_):
-        radius = self.radius
-        position = self.position
-        factor = -3000.0*outersected_ * radius*radius / position.length
-        force = [pos*factor for pos in position]
-        # point = (0.0, 0.0)  # TODO: touchpoint
-        self.b2body.ApplyForce(force=force, point=_ZERO_VECTOR, wake=False)
-
-    def b2subworld_step(self):
+    def _b2subworld_step(self):
         parent_radius = self.radius
-        for child in self.children:
+        for child in self._children:
             outersected_ = outersected(
                 child.radius, parent_radius, child.position.length
                 )
-            if outersected_: child.rake_in(outersected_)
-            if child.drag_target: child.drag_b2body()
-        self.b2subworld.Step(self.time_step, 10, 10)
-        self.b2subworld.ClearForces()
+            if outersected_: child.__rake_in(outersected_)
+            if child._drag_target: child.drag_b2body()
+        self.__b2subworld.Step(self._time_step, 10, 10)
+        self.__b2subworld.ClearForces()
 
-    def b2subworlds_step(self):
+    def _b2subworlds_step(self):
         '''
-        for child in self.children:
-            if not child.children: continue
-            child.b2subworlds_step()
-        self.b2subworld_step()
+        for child in self._children:
+            if not child._children: continue
+            child._b2subworlds_step()
+        self._b2subworld_step()
         '''
-        for item in self.and_childrened_descendants:
-            item.b2subworld_step()
+        for item in self._and_childrened_descendants:
+            item._b2subworld_step()
 
-    def b2superworld_step(self): self.parent.b2subworld_step()
+    def _b2superworld_step(self): self._parent._b2subworld_step()
 
-    def b2superworlds_step(self):
+    def _b2superworlds_step(self):
         '''
-        self.b2superworld_step()
-        if self.parent.parent: self.parent.b2superworlds_step()
+        self._b2superworld_step()
+        if self._parent._parent: self._parent._b2superworlds_step()
         '''
-        for ancestor in self.ancestors:
-            ancestor.b2subworld_step()
+        for ancestor in self._ancestors:
+            ancestor._b2subworld_step()
 
 
 class BodyHierarchyMixin:
     '''
-    _radius, _total_mass, position, radius, total_mass are dummies
+    __radius, __total_mass, position, radius, _total_mass are dummies
     for root instances (without b2body)
     '''
     def __init__(self):
-        self._radius: float
-        self._total_mass: float
-        self.area = self.self_volume
-        self.total_mass = self.self_mass
-        self.b2bodies_to_destroy = []
+        self.__radius: float
+        self.__total_mass: float
+        self._area = self.self_volume
+        self._total_mass = self.self_mass
+        self._b2bodies_to_destroy = []
 
     def _set_time_step(self, time_step):
-        for descendant in self.descendants:
-            descendant.time_step = time_step
+        for descendant in self._descendants:
+            descendant._time_step = time_step
+
+    @property
+    def _total_mass(self): return self.__total_mass
+    @_total_mass.setter
+    def _total_mass(self, mass): self.__total_mass = mass
+
+    def _destroy_b2bodies_to_destroy(self):
+        for b2body in self._b2bodies_to_destroy:
+            b2body.world.DestroyBody(b2body)
+        self._b2bodies_to_destroy = []
+
+    @property
 
     @property
     def position(self): return _ZERO_VECTOR
 
     @property
-    def radius(self): return self._radius
+    def radius(self): return self.__radius
     @radius.setter
-    def radius(self, radius): self._radius = radius
-
-    @property
-    def total_mass(self): return self._total_mass
-    @total_mass.setter
-    def total_mass(self, mass): self._total_mass = mass
-
-    def _destroy_b2bodies_to_destroy(self):
-        for b2body in self.b2bodies_to_destroy:
-            b2body.world.DestroyBody(b2body)
-        self.b2bodies_to_destroy = []
+    def radius(self, radius): self.__radius = radius
 
     def queue_to_destroy(self, item):
-        self.b2bodies_to_destroy.append(item.b2body)
+        self._b2bodies_to_destroy.append(item._b2body)

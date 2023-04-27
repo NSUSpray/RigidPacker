@@ -20,14 +20,14 @@ class _Circle(
         Ui_InteractiveGraphics.__init__(self)
 
     def setRadius(self, r):
-        r *= self._scale
+        r *= self.__scale
         self.setRect(-r, -r, 2.0*r, 2.0*r)  # left top width height
 
     def setPos(self, x, y):
-        super().setPos(x*self._scale, y*self._scale)
+        super().setPos(x*self.__scale, y*self.__scale)
 
     def adoptScale(self):
-        self._scale = self.scene().scale
+        self.__scale = self.scene().scale
         self.setRadius(self._item.radius)
         self.setPos(*self._item.position)
 
@@ -52,25 +52,24 @@ class _Scene(Ctrl_GraphicsScene, QGraphicsScene, Ui_GraphicsScene):
 class GraphicsContainerMixin:
 
     def __init__(self):
-        self.q_item: _Circle = None
+        self._q_item: _Circle = None
 
-    def create_q_item(self):
-        if self.parent.is_root:
-            self.q_item = _Circle(self)
-            self.parent.q_scene.addItem(self.q_item)
+    def _create_q_item(self):
+        if self._parent.is_root:
+            self._q_item = _Circle(self)
+            self._parent._q_scene.addItem(self._q_item)
         else:
-            self.q_item = _Circle(self, self.parent.q_item)
+            self._q_item = _Circle(self, self._parent._q_item)
 
-    def adopt_parent_q_item(self):
-        parent_q_item = None if self.parent.is_root else self.parent.q_item
-        self.q_item.setParentItem(parent_q_item)
+    def _adopt_parent_q_item(self):
+        parent_q_item = None if self._parent.is_root else self._parent._q_item
+        self._q_item.setParentItem(parent_q_item)
 
-    def move_q_item(self): self.q_item.setPos(*self.position)
-
+    def move_q_item(self): self._q_item.setPos(*self.position)
     '''
-    def move_q_items(self):
-        for child in self.children:
-            child.move_q_items()
+    def _move_q_items(self):
+        for child in self._children:
+            child._move_q_items()
             child.move_q_item()
     '''
 
@@ -78,7 +77,7 @@ class GraphicsContainerMixin:
 class GraphicsHierarchyMixin:
 
     def __init__(self):
-        self.q_scene = _Scene(self)
+        self._q_scene = _Scene(self)
 
-    def move_q_items(self):
-        for descendant in self.descendants: descendant.move_q_item()
+    def _move_q_items(self):
+        for descendant in self._descendants: descendant.move_q_item()
