@@ -286,7 +286,7 @@ class Model(
     @target_fps.setter
     def target_fps(self, fps):
         self._target_fps = fps
-        self._set_time_step(1.0 / fps)
+        self.time_step = 1.0 / fps
 
     def stuff(self, container=None):
         """Create and place all container’s descendants."""

@@ -94,16 +94,14 @@ class Ui_GraphicsView:
 class Ui_MainWindow:
 
     def __init__(self):
-        self.setWindowTitle('Rigid Packer')
+        arrangement = self._model._repository.arrangement
+        self.setWindowTitle(f'Rigid Packer: {arrangement}')
         self.statusBar().setStyleSheet('background-color: darkgray;')
         self.resize(800, 600)
         self.setCentralWidget(self._graphics_view)
 
     def updateStatusBar(self, item):
-        message = (
-            f'id: {item.id}'
-            f'    m: {round(item._total_mass)}'
-            f'    V: {round(item._area*1000)}'
-            f'   │   {item.name}'
-            )
+        message = f'  {item.id}    |    {item.name}'
+        if item.product_name:
+            message += f'    |    {item.product_name}'
         self.statusBar().showMessage(message)

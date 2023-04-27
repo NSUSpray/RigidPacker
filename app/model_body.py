@@ -175,10 +175,14 @@ class BodyContainerMixin(_InteractiveBodyMixin, _BodyBase):
 
     def _step_b2subworld(self):
         parent_radius = self.radius
+        # parent_radius = self._b2body.fixtures[0].shape.radius
         for child in self._children:
+            b2body = child._b2body
             outersected_ = outersected(
-                child.radius, parent_radius, child.position.length
-                )
+                b2body.fixtures[0].shape.radius,  # child.radius,
+                parent_radius,
+                b2body.position.length,  # child.position.length,
+            )
             if outersected_: child.__rake_in(outersected_)
             if child._drag_target: child.drag_b2body()
         self.__b2subworld.Step(self._time_step, 10, 10)
@@ -218,10 +222,6 @@ class BodyHierarchyMixin:
         self._total_mass = self.self_mass
         self._b2bodies_to_destroy = []
 
-    def _set_time_step(self, time_step):
-        for descendant in self._descendants:
-            descendant._time_step = time_step
-
     @property
     def _total_mass(self): return self.__total_mass
     @_total_mass.setter
@@ -233,6 +233,12 @@ class BodyHierarchyMixin:
         self._b2bodies_to_destroy = []
 
     @property
+    def time_step(self): return self._time_step
+
+    @time_step.setter
+    def time_step(self, time_step):
+        for self_or_descendant in (self, *self._descendants):
+            self_or_descendant._time_step = time_step
 
     @property
     def position(self): return _ZERO_VECTOR
